@@ -1,0 +1,277 @@
+import React, { useState } from 'react';
+import {
+  Box,
+  TextField,
+  Button,
+  Typography,
+  Paper,
+  Alert,
+  CircularProgress,
+  Tabs,
+  Tab,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid
+} from '@mui/material';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { addHotel, ScrapingResponse } from '../api/hotels';
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
+
+const AddHotel: React.FC = () => {
+  const [value, setValue] = useState(0);
+  const [formData, setFormData] = useState({
+    booking_url: '',
+    check_in_date: '',
+    check_out_date: '',
+    room_type: '',
+    board_type: ''
+  });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const mutation = useMutation({
+    mutationFn: addHotel,
+    onSuccess: (data: ScrapingResponse) => {
+      console.log('Add hotel success:', data);
+      setSuccess(`Hotel "${data.hotel_data?.name}" added successfully!`);
+      setFormData({
+        booking_url: '',
+        check_in_date: '',
+        check_out_date: '',
+        room_type: '',
+        board_type: ''
+      });
+      queryClient.invalidateQueries({ queryKey: ['hotels'] });
+    },
+    onError: (error: any) => {
+      console.error('Add hotel error:', error);
+      setError(error.response?.data?.error || 'Failed to add hotel');
+    }
+  });
+
+  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+    setValue(newValue);
+    setError('');
+    setSuccess('');
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setError('');
+    setSuccess('');
+  };
+
+  const isUrlValid = (url: string): boolean => {
+    return url.includes('booking.com') && url.includes('hotel');
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!formData.booking_url.trim()) {
+      setError('Booking URL is required');
+      return;
+    }
+
+    if (!isUrlValid(formData.booking_url)) {
+      setError('Please enter a valid Booking.com hotel URL');
+      return;
+    }
+
+    mutation.mutate({
+      booking_url: formData.booking_url.trim(),
+      check_in_date: formData.check_in_date || undefined,
+      check_out_date: formData.check_out_date || undefined,
+      room_type: formData.room_type || undefined,
+      board_type: formData.board_type || undefined
+    });
+  };
+
+  return (
+    <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Add Hotel
+      </Typography>
+      
+      <Paper sx={{ mt: 3 }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs value={value} onChange={handleChange} aria-label="hotel addition tabs">
+            <Tab label="Single Hotel" {...a11yProps(0)} />
+          </Tabs>
+        </Box>
+
+        <TabPanel value={value} index={0}>
+          <Typography variant="h6" gutterBottom>
+            Add Single Hotel
+          </Typography>
+          
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Booking.com Hotel URL"
+                  value={formData.booking_url}
+                  onChange={(e) => handleInputChange('booking_url', e.target.value)}
+                  placeholder="https://www.booking.com/hotel/..."
+                  error={Boolean(formData.booking_url && !isUrlValid(formData.booking_url))}
+                  helperText={
+                    formData.booking_url && !isUrlValid(formData.booking_url)
+                      ? 'Please enter a valid Booking.com hotel URL'
+                      : 'Enter a Booking.com hotel URL to scrape and add hotel data'
+                  }
+                  required
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Check-in Date"
+                  type="date"
+                  value={formData.check_in_date}
+                  onChange={(e) => handleInputChange('check_in_date', e.target.value)}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Check-out Date"
+                  type="date"
+                  value={formData.check_out_date}
+                  onChange={(e) => handleInputChange('check_out_date', e.target.value)}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Room Type</InputLabel>
+                  <Select
+                    value={formData.room_type}
+                    label="Room Type"
+                    onChange={(e) => handleInputChange('room_type', e.target.value)}
+                  >
+                    <MenuItem value="">Any</MenuItem>
+                    <MenuItem value="single">Single Room</MenuItem>
+                    <MenuItem value="double">Double Room</MenuItem>
+                    <MenuItem value="twin">Twin Room</MenuItem>
+                    <MenuItem value="triple">Triple Room</MenuItem>
+                    <MenuItem value="family">Family Room</MenuItem>
+                    <MenuItem value="suite">Suite</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Board Type</InputLabel>
+                  <Select
+                    value={formData.board_type}
+                    label="Board Type"
+                    onChange={(e) => handleInputChange('board_type', e.target.value)}
+                  >
+                    <MenuItem value="">Any</MenuItem>
+                    <MenuItem value="room_only">Room Only</MenuItem>
+                    <MenuItem value="bed_and_breakfast">Bed & Breakfast</MenuItem>
+                    <MenuItem value="half_board">Half Board</MenuItem>
+                    <MenuItem value="full_board">Full Board</MenuItem>
+                    <MenuItem value="all_inclusive">All Inclusive</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  disabled={mutation.isPending || !formData.booking_url.trim()}
+                  startIcon={mutation.isPending ? <CircularProgress size={20} /> : null}
+                >
+                  {mutation.isPending ? 'Adding Hotel...' : 'Add Hotel'}
+                </Button>
+              </Grid>
+            </Grid>
+          </Box>
+        </TabPanel>
+      </Paper>
+
+      {error && (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {success && (
+        <Alert severity="success" sx={{ mt: 2 }}>
+          {success}
+        </Alert>
+      )}
+
+      <Paper sx={{ mt: 3, p: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          How to Add a Hotel
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          1. Go to Booking.com and find the hotel you want to monitor<br/>
+          2. Copy the hotel's URL from your browser<br/>
+          3. Paste it in the "Booking.com Hotel URL" field above<br/>
+          4. Optionally set check-in/check-out dates and room preferences<br/>
+          5. Click "Add Hotel" to scrape and store the hotel data
+        </Typography>
+      </Paper>
+    </Box>
+  );
+};
+
+export default AddHotel; 
