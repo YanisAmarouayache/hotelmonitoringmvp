@@ -28,7 +28,7 @@ export interface HotelPrice {
   currency: string;
   room_type: string | null;
   board_type: string | null;
-  created_at: string;
+  scraped_at: string;
 }
 
 export interface ScrapingRequest {

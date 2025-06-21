@@ -19,7 +19,6 @@ import {
   ListItemIcon,
   ListItemText,
   IconButton,
-  Tooltip,
   TextField
 } from '@mui/material';
 import {
@@ -40,7 +39,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getHotel, getHotelPrices, updateHotelPrices, Hotel, HotelPrice } from '../api/hotels';
+import { getHotel, getHotelPrices, updateHotelPrices } from '../api/hotels';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -394,7 +393,7 @@ const HotelDetails: React.FC = () => {
                               {formatDate(price.check_in_date)} - {formatDate(price.check_out_date)}
                             </Typography>
                             <Typography variant="caption" color="text.secondary" display="block">
-                              Updated: {formatDate(price.created_at)}
+                              Updated: {formatDate(price.scraped_at)}
                             </Typography>
                           </CardContent>
                         </Card>
@@ -488,7 +487,7 @@ const HotelDetails: React.FC = () => {
                         secondary={`${formatDate(price.check_in_date)} - ${formatDate(price.check_out_date)}`}
                       />
                       <Typography variant="caption" color="text.secondary">
-                        {formatDate(price.created_at)}
+                        {formatDate(price.scraped_at)}
                       </Typography>
                     </ListItem>
                   ))}
