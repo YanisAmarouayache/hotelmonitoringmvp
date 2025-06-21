@@ -111,4 +111,5 @@ class ScrapingResponse(BaseModel):
     success: bool
     hotel_data: Optional[HotelResponse] = None
     price_data: Optional[HotelPriceResponse] = None
+    guest_info: Optional[Dict[str, Any]] = None
     error: Optional[str] = None 

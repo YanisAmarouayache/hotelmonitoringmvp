@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import json
 import logging
 import os
+from urllib.parse import urlparse, parse_qs
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -71,18 +72,28 @@ class BookingScraper:
         
         Args:
             url: Booking.com hotel URL
-            check_in_date: Check-in date (YYYY-MM-DD)
-            check_out_date: Check-out date (YYYY-MM-DD)
+            check_in_date: Check-in date (YYYY-MM-DD) - will be extracted from URL if not provided
+            check_out_date: Check-out date (YYYY-MM-DD) - will be extracted from URL if not provided
             
         Returns:
             Dictionary containing hotel data
         """
         try:
-            # Add dates to URL if provided
-            if check_in_date and check_out_date:
-                url = self._add_dates_to_url(url, check_in_date, check_out_date)
+            # Extract dates and guest info from URL if not provided
+            url_check_in, url_check_out, guest_info = self._extract_dates_from_url(url)
+            
+            # Use provided dates or extracted dates
+            final_check_in = check_in_date or url_check_in
+            final_check_out = check_out_date or url_check_out
+            
+            # Add dates to URL if we have them
+            if final_check_in and final_check_out:
+                url = self._add_dates_to_url(url, final_check_in, final_check_out)
             
             logger.info(f"Scraping hotel data from: {url}")
+            logger.info(f"Check-in: {final_check_in}, Check-out: {final_check_out}")
+            if guest_info:
+                logger.info(f"Guest info: {guest_info}")
             
             # Make request
             headers = self._add_headers(url)
@@ -97,7 +108,17 @@ class BookingScraper:
             
             # Extract data from hotel page
             print("=== Extracting from HOTEL page ===")
-            return self._extract_from_hotel_page(soup, url)
+            result = self._extract_from_hotel_page(soup, url)
+            
+            # Add extracted dates and guest info to result
+            if final_check_in:
+                result['check_in_date'] = final_check_in
+            if final_check_out:
+                result['check_out_date'] = final_check_out
+            if guest_info:
+                result['guest_info'] = guest_info
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error scraping hotel data: {str(e)}")
@@ -106,6 +127,35 @@ class BookingScraper:
                 'booking_url': url,
                 'scraped_at': datetime.now().isoformat()
             }
+    
+    def _extract_dates_from_url(self, url: str) -> tuple[Optional[str], Optional[str], Optional[dict]]:
+        """Extract check-in, check-out dates and guest info from URL parameters."""
+        try:
+            parsed_url = urlparse(url)
+            params = parse_qs(parsed_url.query)
+            
+            # Extract dates
+            check_in = params.get('checkin', [None])[0]
+            check_out = params.get('checkout', [None])[0]
+            
+            # Extract guest info
+            guest_info = {}
+            if 'group_adults' in params:
+                guest_info['adults'] = int(params['group_adults'][0])
+            if 'group_children' in params:
+                guest_info['children'] = int(params['group_children'][0])
+            if 'req_adults' in params:
+                guest_info['adults'] = int(params['req_adults'][0])
+            if 'req_children' in params:
+                guest_info['children'] = int(params['req_children'][0])
+            
+            print(f"Extracted from URL - Check-in: {check_in}, Check-out: {check_out}, Guests: {guest_info}")
+            
+            return check_in, check_out, guest_info if guest_info else None
+            
+        except Exception as e:
+            logger.warning(f"Error extracting dates from URL: {e}")
+            return None, None, None
     
     def _extract_from_hotel_page(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
         """Extract data from individual hotel page."""
@@ -306,17 +356,17 @@ class BookingScraper:
         try:
             rooms_data = []
             
-            # Try to extract from JSON data first
-            json_rooms = self._extract_room_types_from_json(soup)
-            if json_rooms:
-                print(f"Found {len(json_rooms)} rooms in JSON data")
-                return json_rooms
-            
-            # Try to extract from room selection table
+            # Try to extract from room selection table FIRST (most reliable)
             table_rooms = self._extract_rooms_from_selection_table(soup)
             if table_rooms:
                 print(f"Found {len(table_rooms)} rooms in selection table")
                 return table_rooms
+            
+            # Try to extract from JSON data as fallback
+            json_rooms = self._extract_room_types_from_json(soup)
+            if json_rooms:
+                print(f"Found {len(json_rooms)} rooms in JSON data")
+                return json_rooms
             
             # Try HTML selectors for room cards - use more specific selectors
             room_selectors = [
@@ -376,110 +426,274 @@ class BookingScraper:
         try:
             rooms_data = []
             
-            # Look for the room selection section
-            # First, find the text that indicates room selection
-            room_selection_text = soup.find(text=re.compile(r'Select a room type', re.IGNORECASE))
-            if not room_selection_text:
-                print("Room selection text not found")
-                return []
+            # Look for table rows with data-hotel-rounded-price attribute
+            price_rows = soup.find_all('tr', attrs={'data-hotel-rounded-price': True})
             
-            print("Found room selection text, looking for room table...")
-            
-            # Look for room types directly in the HTML
-            # Based on the rendered content, look for room type names
-            room_type_patterns = [
-                r'Small Double Room',
-                r'Single Room', 
-                r'Superior Double Room',
-                r'Double Room',
-                r'Twin Room',
-                r'Triple Room',
-                r'Family Room',
-                r'Suite',
-                r'Deluxe Room',
-                r'Standard Room'
-            ]
-            
-            # Find all elements that might contain room information
-            potential_room_elements = soup.find_all(['div', 'tr', 'td', 'span'], class_=re.compile(r'room|price|rate|accommodation'))
-            
-            for element in potential_room_elements:
-                element_text = element.get_text(strip=True)
+            if price_rows:
+                print(f"Found {len(price_rows)} rows with data-hotel-rounded-price attribute")
                 
-                # Check if this element contains a room type
-                for pattern in room_type_patterns:
-                    if pattern in element_text:
-                        print(f"Found room type: {pattern}")
+                for row in price_rows:
+                    try:
+                        # Extract price from the data attribute
+                        price_attr = row.get('data-hotel-rounded-price')
+                        price = float(price_attr) if price_attr else None
                         
-                        # Look for price in the same element or nearby
-                        price = self._extract_price_from_text(element_text)
-                        
-                        # If no price in this element, look in parent or siblings
-                        if not price:
-                            parent = element.parent
-                            if parent:
-                                parent_text = parent.get_text(strip=True)
-                                price = self._extract_price_from_text(parent_text)
-                        
-                        # Look for board type (breakfast info)
+                        # Find room type by looking for the data-et-mouseenter element within this row
+                        room_type = None
                         board_type = None
-                        if 'breakfast' in element_text.lower():
-                            breakfast_match = re.search(r'breakfast.*?€\s*(\d+)', element_text, re.IGNORECASE)
+                        
+                        # Look for the div with data-et-mouseenter="goal:hp_rt_hovering_room_name" within this row
+                        room_name_div = row.find('div', attrs={'data-et-mouseenter': 'goal:hp_rt_hovering_room_name'})
+                        if room_name_div:
+                            # Look for the span with hprt-roomtype-icon-link class within this div
+                            room_span = room_name_div.find('span', class_='hprt-roomtype-icon-link')
+                            if room_span:
+                                room_type = room_span.get_text(strip=True)
+                                print(f"Found room type in row: {room_type}")
+                        
+                        # If we still don't have room type, try alternative methods within the row
+                        if not room_type:
+                            # Look for any text that looks like a room type in the entire row
+                            row_text = row.get_text()
+                            room_type_patterns = [
+                                r'Small Double Room',
+                                r'Single Room', 
+                                r'Superior Double Room',
+                                r'Double Room',
+                                r'Twin Room',
+                                r'Triple Room',
+                                r'Family Room',
+                                r'Suite',
+                                r'Deluxe Room',
+                                r'Standard Room'
+                            ]
+                            
+                            for pattern in room_type_patterns:
+                                if pattern in row_text:
+                                    room_type = pattern
+                                    print(f"Found room type using pattern: {room_type}")
+                                    break
+                        
+                        # Look for board type (breakfast info) in the row
+                        row_text = row.get_text()
+                        if 'breakfast' in row_text.lower():
+                            breakfast_match = re.search(r'breakfast.*?€\s*(\d+)', row_text, re.IGNORECASE)
                             if breakfast_match:
                                 board_type = f"Breakfast €{breakfast_match.group(1)}"
                         
-                        # Only add if we have a valid room type
-                        if pattern and (price or 'room' in pattern.lower()):
+                        # Only add if we have at least room type or price
+                        if room_type or price:
                             room_data = {
-                                'room_type': pattern,
+                                'room_type': room_type,
+                                'price': price,
+                                'board_type': board_type,
+                                'currency': 'EUR'  # Default
+                            }
+                            rooms_data.append(room_data)
+                            print(f"Extracted room from data-hotel-rounded-price: {room_type} - {price} EUR - {board_type}")
+                    
+                    except Exception as e:
+                        print(f"Error extracting room from row: {e}")
+                        continue
+            
+            # If no rooms found with data-hotel-rounded-price, try the specific data attribute method
+            if not rooms_data:
+                print("No rooms found with data-hotel-rounded-price, trying data-et-mouseenter method...")
+                
+                # Look for room elements with the specific data attribute
+                room_elements = soup.find_all(attrs={'data-et-mouseenter': 'goal:hp_rt_hovering_room_name'})
+                
+                if room_elements:
+                    print(f"Found {len(room_elements)} room elements with data-et-mouseenter attribute")
+                    
+                    for room_element in room_elements:
+                        try:
+                            # Extract room type from the element
+                            room_type = room_element.get_text(strip=True)
+                            if room_type:
+                                room_type = re.sub(r'\s+', ' ', room_type).strip()
+                            
+                            # Look for price in the same element or nearby
+                            price = None
+                            board_type = None
+                            
+                            # First, try to find price in the same element
+                            price_element = room_element.find(class_=re.compile(r'bui-price-display__value'))
+                            if not price_element:
+                                # Try the exact class combination
+                                price_element = room_element.find(class_='bui-price-display__value prco-text-nowrap-helper prco-inline-block-maker-helper prco-f-font-heading')
+                            
+                            if not price_element:
+                                # Look in parent element
+                                parent = room_element.parent
+                                if parent:
+                                    price_element = parent.find(class_=re.compile(r'bui-price-display__value'))
+                            
+                            if not price_element:
+                                # Look in siblings
+                                next_sibling = room_element.find_next_sibling()
+                                if next_sibling:
+                                    price_element = next_sibling.find(class_=re.compile(r'bui-price-display__value'))
+                            
+                            if not price_element:
+                                # Look in the broader context (within the same container)
+                                container = room_element.find_parent(['div', 'tr', 'td'])
+                                if container:
+                                    price_element = container.find(class_=re.compile(r'bui-price-display__value'))
+                            
+                            if price_element:
+                                price_text = price_element.get_text(strip=True)
+                                price = self._extract_price_from_text(price_text)
+                            
+                            # Look for board type (breakfast info) in the same context
+                            board_element = room_element.find(text=re.compile(r'breakfast|meal|board', re.IGNORECASE))
+                            if board_element and board_element.parent:
+                                board_type = board_element.parent.get_text(strip=True)
+                                board_type = re.sub(r'\s+', ' ', board_type).strip()
+                            
+                            # Only add if we have at least room type or price
+                            if room_type or price:
+                                room_data = {
+                                    'room_type': room_type,
+                                    'price': price,
+                                    'board_type': board_type,
+                                    'currency': 'EUR'  # Default
+                                }
+                                rooms_data.append(room_data)
+                                print(f"Extracted room: {room_type} - {price} EUR - {board_type}")
+                        
+                        except Exception as e:
+                            print(f"Error extracting room from element: {e}")
+                            continue
+            
+            # If still no rooms found, try the table approach
+            if not rooms_data:
+                print("No rooms found with data-et-mouseenter, trying table approach...")
+                
+                # Look for the specific caption first
+                caption = soup.find('caption', class_='invisible_spoken')
+                if caption and 'Select a room type and the number of rooms you want to reserve' in caption.get_text():
+                    print("Found room selection caption, looking for table...")
+                    
+                    # Find the table that follows this caption
+                    table = caption.find_parent('table')
+                    if not table:
+                        # Try to find the next table after the caption
+                        next_element = caption.find_next_sibling()
+                        while next_element and next_element.name != 'table':
+                            next_element = next_element.find_next_sibling()
+                        table = next_element
+                    
+                    if table:
+                        print("Found room selection table")
+                        
+                        # Look for table rows
+                        rows = table.find_all('tr')
+                        for row in rows:
+                            try:
+                                # Skip header rows
+                                if row.find('th'):
+                                    continue
+                                
+                                # Extract room type
+                                room_type_cell = row.find('td', class_=re.compile(r'room-type|room_name|roomName'))
+                                if not room_type_cell:
+                                    # Try alternative selectors
+                                    room_type_cell = row.find('td', {'data-testid': 'room-type'})
+                                if not room_type_cell:
+                                    # Try any cell that might contain room name
+                                    cells = row.find_all('td')
+                                    for cell in cells:
+                                        text = cell.get_text(strip=True)
+                                        if text and len(text) > 10 and any(word in text.lower() for word in ['room', 'suite', 'double', 'single', 'twin', 'triple']):
+                                            room_type_cell = cell
+                                            break
+                                
+                                room_type = None
+                                if room_type_cell:
+                                    room_type = room_type_cell.get_text(strip=True)
+                                    # Clean up room type
+                                    room_type = re.sub(r'\s+', ' ', room_type).strip()
+                                
+                                # Extract price
+                                price_cell = row.find('td', class_=re.compile(r'price|rate|amount'))
+                                if not price_cell:
+                                    price_cell = row.find('td', {'data-testid': 'price'})
+                                if not price_cell:
+                                    # Try to find price in any cell
+                                    cells = row.find_all('td')
+                                    for cell in cells:
+                                        text = cell.get_text(strip=True)
+                                        if re.search(r'€\s*\d+|\d+\s*€|\$\s*\d+|\d+\s*\$|£\s*\d+|\d+\s*£', text):
+                                            price_cell = cell
+                                            break
+                                
+                                price = None
+                                if price_cell:
+                                    price_text = price_cell.get_text(strip=True)
+                                    price = self._extract_price_from_text(price_text)
+                                
+                                # Extract board type
+                                board_cell = row.find('td', class_=re.compile(r'board|meal|breakfast'))
+                                if not board_cell:
+                                    board_cell = row.find('td', {'data-testid': 'board-type'})
+                                
+                                board_type = None
+                                if board_cell:
+                                    board_type = board_cell.get_text(strip=True)
+                                    board_type = re.sub(r'\s+', ' ', board_type).strip()
+                                
+                                # Only add if we have at least room type or price
+                                if room_type or price:
+                                    room_data = {
+                                        'room_type': room_type,
+                                        'price': price,
+                                        'board_type': board_type,
+                                        'currency': 'EUR'  # Default
+                                    }
+                                    rooms_data.append(room_data)
+                                    print(f"Extracted room from table: {room_type} - {price} EUR - {board_type}")
+                            
+                            except Exception as e:
+                                print(f"Error extracting room from row: {e}")
+                                continue
+                    else:
+                        print("No table found after room selection caption")
+                else:
+                    print("Room selection caption not found")
+            
+            # If still no rooms found, try alternative methods
+            if not rooms_data:
+                print("Trying alternative room extraction methods...")
+                
+                # Look for room cards or other room elements
+                room_elements = soup.find_all('div', class_=re.compile(r'room|accommodation|property'))
+                for element in room_elements:
+                    try:
+                        # Extract room type from element
+                        room_type = self._extract_room_type_from_element(element)
+                        price = self._extract_price_from_element(element)
+                        board_type = self._extract_board_type_from_element(element)
+                        
+                        if room_type or price:
+                            room_data = {
+                                'room_type': room_type,
                                 'price': price,
                                 'board_type': board_type,
                                 'currency': 'EUR'
                             }
                             rooms_data.append(room_data)
-                            print(f"Extracted room from table: {pattern} - {price} EUR")
-                            break
+                            print(f"Extracted room (alternative): {room_type} - {price} EUR - {board_type}")
+                    
+                    except Exception as e:
+                        print(f"Error extracting room from element: {e}")
+                        continue
             
-            # If we didn't find rooms with the pattern approach, try looking for price elements
-            if not rooms_data:
-                print("Trying alternative approach - looking for price elements...")
-                
-                # Look for price elements and try to find associated room types
-                price_elements = soup.find_all(text=re.compile(r'€\s*\d+'))
-                
-                for price_text in price_elements:
-                    if price_text.parent:
-                        parent_element = price_text.parent
-                        parent_text = parent_element.get_text(strip=True)
-                        
-                        # Extract price
-                        price = self._extract_price_from_text(price_text)
-                        
-                        # Look for room type in the same element or nearby
-                        room_type = None
-                        for pattern in room_type_patterns:
-                            if pattern in parent_text:
-                                room_type = pattern
-                                break
-                        
-                        # If we found both price and room type, add it
-                        if price and room_type:
-                            # Check if we already have this room type
-                            existing_room = next((r for r in rooms_data if r['room_type'] == room_type), None)
-                            if not existing_room:
-                                room_data = {
-                                    'room_type': room_type,
-                                    'price': price,
-                                    'board_type': None,
-                                    'currency': 'EUR'
-                                }
-                                rooms_data.append(room_data)
-                                print(f"Extracted room from price element: {room_type} - {price} EUR")
-            
+            print(f"Total rooms extracted: {len(rooms_data)}")
             return rooms_data
             
         except Exception as e:
-            logger.warning(f"Error extracting rooms from selection table: {e}")
+            logger.error(f"Error extracting rooms from selection table: {e}")
             return []
     
     def _extract_room_type_from_element(self, element) -> Optional[str]:

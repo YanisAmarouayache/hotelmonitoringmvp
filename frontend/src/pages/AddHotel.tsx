@@ -70,7 +70,23 @@ const AddHotel: React.FC = () => {
     mutationFn: addHotel,
     onSuccess: (data: ScrapingResponse) => {
       console.log('Add hotel success:', data);
-      setSuccess(`Hotel "${data.hotel_data?.name}" added successfully!`);
+      let successMessage = `Hotel "${data.hotel_data?.name}" added successfully!`;
+      
+      // Add guest information if available
+      if (data.guest_info) {
+        const guests = [];
+        if (data.guest_info.adults) {
+          guests.push(`${data.guest_info.adults} adult${data.guest_info.adults > 1 ? 's' : ''}`);
+        }
+        if (data.guest_info.children) {
+          guests.push(`${data.guest_info.children} child${data.guest_info.children > 1 ? 'ren' : ''}`);
+        }
+        if (guests.length > 0) {
+          successMessage += ` (${guests.join(', ')})`;
+        }
+      }
+      
+      setSuccess(successMessage);
       setFormData({
         booking_url: '',
         check_in_date: '',

@@ -110,10 +110,14 @@ async def scrape_hotel(
         # Add price data if available
         price_data = None
         if scraped_data.get('price'):
+            # Use extracted dates from URL if available
+            check_in = request.check_in_date or scraped_data.get('check_in_date')
+            check_out = request.check_out_date or scraped_data.get('check_out_date')
+            
             price_data = HotelPrice(
                 hotel_id=hotel.id,
-                check_in_date=datetime.strptime(request.check_in_date, '%Y-%m-%d') if request.check_in_date else datetime.now(),
-                check_out_date=datetime.strptime(request.check_out_date, '%Y-%m-%d') if request.check_out_date else datetime.now() + timedelta(days=1),
+                check_in_date=datetime.strptime(check_in, '%Y-%m-%d') if check_in else datetime.now(),
+                check_out_date=datetime.strptime(check_out, '%Y-%m-%d') if check_out else datetime.now() + timedelta(days=1),
                 price=scraped_data['price'],
                 currency=scraped_data.get('currency', 'EUR'),
                 room_type=scraped_data.get('room_type') or request.room_type,
@@ -127,6 +131,10 @@ async def scrape_hotel(
         rooms_data = scraped_data.get('rooms_data', [])
         added_rooms = []
         if rooms_data:
+            # Use extracted dates from URL if available
+            check_in = request.check_in_date or scraped_data.get('check_in_date')
+            check_out = request.check_out_date or scraped_data.get('check_out_date')
+            
             for room_info in rooms_data:
                 try:
                     # Validate room data before adding
@@ -151,8 +159,8 @@ async def scrape_hotel(
                     
                     room_price = HotelPrice(
                         hotel_id=hotel.id,
-                        check_in_date=datetime.strptime(request.check_in_date, '%Y-%m-%d') if request.check_in_date else datetime.now(),
-                        check_out_date=datetime.strptime(request.check_out_date, '%Y-%m-%d') if request.check_out_date else datetime.now() + timedelta(days=1),
+                        check_in_date=datetime.strptime(check_in, '%Y-%m-%d') if check_in else datetime.now(),
+                        check_out_date=datetime.strptime(check_out, '%Y-%m-%d') if check_out else datetime.now() + timedelta(days=1),
                         price=price,
                         currency=room_info.get('currency', 'EUR'),
                         room_type=room_type,
@@ -168,11 +176,17 @@ async def scrape_hotel(
             db.commit()
             print(f"Added {len(added_rooms)} room options to database")
         
-        return ScrapingResponse(
-            success=True,
-            hotel_data=hotel,
-            price_data=price_data
-        )
+        # Add guest information to response if available
+        response_data = {
+            'success': True,
+            'hotel_data': hotel,
+            'price_data': price_data
+        }
+        
+        if scraped_data.get('guest_info'):
+            response_data['guest_info'] = scraped_data['guest_info']
+        
+        return ScrapingResponse(**response_data)
         
     except Exception as e:
         return ScrapingResponse(

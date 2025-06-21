@@ -43,6 +43,10 @@ export interface ScrapingResponse {
   success: boolean;
   hotel_data?: Hotel;
   price_data?: HotelPrice;
+  guest_info?: {
+    adults?: number;
+    children?: number;
+  };
   error?: string;
 }
 
