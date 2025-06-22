@@ -17,18 +17,24 @@ export interface Hotel {
   longitude: number | null;
   created_at: string;
   updated_at: string;
+  is_active: boolean;
 }
 
 export interface HotelPrice {
   id: number;
   hotel_id: number;
-  check_in_date: string;
-  check_out_date: string;
+  room_type: string;
   price: number;
   currency: string;
-  room_type: string | null;
-  board_type: string | null;
+  check_in_date: string;
+  check_out_date: string;
   scraped_at: string;
+  board_type: string | null;
+  source: string;
+}
+
+export interface HotelWithPrices extends Hotel {
+  prices: HotelPrice[];
 }
 
 export interface ScrapingRequest {
@@ -59,8 +65,8 @@ export const getHotels = async (): Promise<Hotel[]> => {
 };
 
 // Get hotel by ID
-export const getHotel = async (id: number): Promise<Hotel> => {
-  const response = await axios.get(`${API_BASE_URL}/hotels/${id}`);
+export const getHotel = async (id: number): Promise<HotelWithPrices> => {
+  const response = await axios.get(`${API_BASE_URL}/hotels/${id}/with-prices`);
   return response.data;
 };
 
@@ -75,7 +81,7 @@ export const updateHotelPrices = async (
   hotelId: number,
   checkInDate?: string,
   checkOutDate?: string
-): Promise<{ success: boolean; price_data?: HotelPrice; message?: string }> => {
+): Promise<{ success: boolean; prices_added?: number; message?: string }> => {
   const response = await axios.post(`${API_BASE_URL}/scraping/update-prices/${hotelId}`, {
     check_in_date: checkInDate,
     check_out_date: checkOutDate

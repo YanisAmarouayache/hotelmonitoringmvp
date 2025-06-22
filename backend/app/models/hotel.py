@@ -30,13 +30,13 @@ class HotelPrice(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     hotel_id = Column(Integer, nullable=False)
-    check_in_date = Column(DateTime, nullable=False)
-    check_out_date = Column(DateTime, nullable=False)
+    room_type = Column(String, nullable=False)
     price = Column(Float, nullable=False)
     currency = Column(String, default="EUR")
-    room_type = Column(String)
-    board_type = Column(String)
+    check_in_date = Column(DateTime, nullable=False)
+    check_out_date = Column(DateTime, nullable=False)
     scraped_at = Column(DateTime(timezone=True), server_default=func.now())
+    board_type = Column(String)
     source = Column(String, default="booking.com")
 
 # Pydantic Models for API

@@ -156,7 +156,7 @@ async def get_hotel_with_prices(
     days_back: int = Query(30, ge=1, le=365),
     db: Session = Depends(get_db)
 ):
-    """Get hotel with recent price data."""
+    """Get hotel with recent price data grouped by room type."""
     hotel = db.query(Hotel).filter(Hotel.id == hotel_id).first()
     if not hotel:
         raise HTTPException(status_code=404, detail="Hotel not found")
@@ -166,7 +166,7 @@ async def get_hotel_with_prices(
     prices = db.query(HotelPrice).filter(
         HotelPrice.hotel_id == hotel_id,
         HotelPrice.scraped_at >= cutoff_date
-    ).order_by(HotelPrice.scraped_at.desc()).all()
+    ).order_by(HotelPrice.check_in_date.desc(), HotelPrice.scraped_at.desc()).all()
     
     return HotelWithPrices(
         **hotel.__dict__,

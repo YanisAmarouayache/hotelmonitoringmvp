@@ -4,6 +4,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 import sys
 import os
+from pydantic import BaseModel
 
 # Add the scraper directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'scraper'))
@@ -16,6 +17,10 @@ from app.models.hotel import (
 )
 
 router = APIRouter()
+
+class UpdatePricesRequest(BaseModel):
+    check_in_date: str
+    check_out_date: str
 
 @router.post("/hotel", response_model=ScrapingResponse)
 async def scrape_hotel(
@@ -107,80 +112,61 @@ async def scrape_hotel(
         db.commit()
         db.refresh(hotel)
         
-        # Add price data if available
-        price_data = None
-        if scraped_data.get('price'):
-            # Use extracted dates from URL if available
-            check_in = request.check_in_date or scraped_data.get('check_in_date')
-            check_out = request.check_out_date or scraped_data.get('check_out_date')
-            
-            price_data = HotelPrice(
-                hotel_id=hotel.id,
-                check_in_date=datetime.strptime(check_in, '%Y-%m-%d') if check_in else datetime.now(),
-                check_out_date=datetime.strptime(check_out, '%Y-%m-%d') if check_out else datetime.now() + timedelta(days=1),
-                price=scraped_data['price'],
-                currency=scraped_data.get('currency', 'EUR'),
-                room_type=scraped_data.get('room_type') or request.room_type,
-                board_type=scraped_data.get('board_type') or request.board_type
-            )
-            db.add(price_data)
-            db.commit()
-            db.refresh(price_data)
+        # Get dates for price records
+        check_in = request.check_in_date or scraped_data.get('check_in_date')
+        check_out = request.check_out_date or scraped_data.get('check_out_date')
         
-        # Add multiple room options if available
+        if not check_in or not check_out:
+            return ScrapingResponse(
+                success=False,
+                error="Check-in and check-out dates are required for price scraping"
+            )
+        
+        check_in_dt = datetime.strptime(check_in, '%Y-%m-%d')
+        check_out_dt = datetime.strptime(check_out, '%Y-%m-%d')
+        
+        # Add price data for each room type found
+        added_prices = []
         rooms_data = scraped_data.get('rooms_data', [])
-        added_rooms = []
+        
         if rooms_data:
-            # Use extracted dates from URL if available
-            check_in = request.check_in_date or scraped_data.get('check_in_date')
-            check_out = request.check_out_date or scraped_data.get('check_out_date')
-            
             for room_info in rooms_data:
                 try:
-                    # Validate room data before adding
                     room_type = room_info.get('room_type')
                     price = room_info.get('price')
                     
-                    # Skip if room type is invalid or contains error messages
-                    if room_type and any(error_text in room_type.lower() for error_text in [
-                        'something went wrong',
-                        'please try again',
-                        'error',
-                        'loading',
-                        'unavailable'
-                    ]):
-                        print(f"Skipping invalid room type: {room_type}")
+                    # Skip if no room type or price
+                    if not room_type or not price:
+                        print(f"Skipping room with missing data: {room_info}")
                         continue
                     
-                    # Skip if no price and no valid room type
-                    if not price and not room_type:
-                        print(f"Skipping room with no price and no room type")
-                        continue
-                    
-                    room_price = HotelPrice(
+                    # Create price record
+                    price_data = HotelPrice(
                         hotel_id=hotel.id,
-                        check_in_date=datetime.strptime(check_in, '%Y-%m-%d') if check_in else datetime.now(),
-                        check_out_date=datetime.strptime(check_out, '%Y-%m-%d') if check_out else datetime.now() + timedelta(days=1),
+                        room_type=room_type,
                         price=price,
                         currency=room_info.get('currency', 'EUR'),
-                        room_type=room_type,
-                        board_type=room_info.get('board_type')
+                        check_in_date=check_in_dt,
+                        check_out_date=check_out_dt,
+                        board_type=room_info.get('board_type'),
+                        source='booking.com'
                     )
-                    db.add(room_price)
-                    added_rooms.append(room_info)
-                    print(f"Added room: {room_type} - {price} EUR")
+                    db.add(price_data)
+                    added_prices.append(price_data)
+                    print(f"Added price: {room_type} - {price} EUR for {check_in}")
+                
                 except Exception as e:
                     print(f"Error adding room price data: {e}")
                     continue
             
             db.commit()
-            print(f"Added {len(added_rooms)} room options to database")
+            print(f"Added {len(added_prices)} price records to database")
         
         # Add guest information to response if available
         response_data = {
             'success': True,
             'hotel_data': hotel,
-            'price_data': price_data
+            'price_data': added_prices[0] if added_prices else None
         }
         
         if scraped_data.get('guest_info'):
@@ -197,8 +183,7 @@ async def scrape_hotel(
 @router.post("/update-prices/{hotel_id}")
 async def update_hotel_prices(
     hotel_id: int,
-    check_in_date: Optional[str] = None,
-    check_out_date: Optional[str] = None,
+    request: UpdatePricesRequest,
     db: Session = Depends(get_db)
 ):
     """Update prices for an existing hotel."""
@@ -209,13 +194,11 @@ async def update_hotel_prices(
     try:
         scraper = BookingScraper()
         
-        # Add dates to URL if provided
-        url = hotel.booking_url
-        if check_in_date and check_out_date:
-            url = scraper._add_dates_to_url(url, check_in_date, check_out_date)
+        # Add dates to URL
+        url = scraper._add_dates_to_url(hotel.booking_url, request.check_in_date, request.check_out_date)
         
         # Extract updated data
-        scraped_data = scraper.extract_hotel_data(url, check_in_date, check_out_date)
+        scraped_data = scraper.extract_hotel_data(url, request.check_in_date, request.check_out_date)
         
         if 'error' in scraped_data:
             return {
@@ -223,72 +206,50 @@ async def update_hotel_prices(
                 'error': scraped_data['error']
             }
         
-        # Add new price data
-        price_data = None
-        if scraped_data.get('price'):
-            price_data = HotelPrice(
-                hotel_id=hotel.id,
-                check_in_date=datetime.strptime(check_in_date, '%Y-%m-%d') if check_in_date else datetime.now(),
-                check_out_date=datetime.strptime(check_out_date, '%Y-%m-%d') if check_out_date else datetime.now() + timedelta(days=1),
-                price=scraped_data['price'],
-                currency=scraped_data.get('currency', 'EUR'),
-                room_type=scraped_data.get('room_type'),
-                board_type=scraped_data.get('board_type')
-            )
-            db.add(price_data)
-            db.commit()
-            db.refresh(price_data)
+        check_in_dt = datetime.strptime(request.check_in_date, '%Y-%m-%d')
+        check_out_dt = datetime.strptime(request.check_out_date, '%Y-%m-%d')
         
-        # Add multiple room options if available
+        # Add new price data for each room type
+        added_prices = []
         rooms_data = scraped_data.get('rooms_data', [])
-        added_rooms = []
+        
         if rooms_data:
             for room_info in rooms_data:
                 try:
-                    # Validate room data before adding
                     room_type = room_info.get('room_type')
                     price = room_info.get('price')
                     
-                    # Skip if room type is invalid or contains error messages
-                    if room_type and any(error_text in room_type.lower() for error_text in [
-                        'something went wrong',
-                        'please try again',
-                        'error',
-                        'loading',
-                        'unavailable'
-                    ]):
-                        print(f"Skipping invalid room type: {room_type}")
+                    # Skip if no room type or price
+                    if not room_type or not price:
+                        print(f"Skipping room with missing data: {room_info}")
                         continue
                     
-                    # Skip if no price and no valid room type
-                    if not price and not room_type:
-                        print(f"Skipping room with no price and no room type")
-                        continue
-                    
-                    room_price = HotelPrice(
+                    # Create price record
+                    price_data = HotelPrice(
                         hotel_id=hotel.id,
-                        check_in_date=datetime.strptime(check_in_date, '%Y-%m-%d') if check_in_date else datetime.now(),
-                        check_out_date=datetime.strptime(check_out_date, '%Y-%m-%d') if check_out_date else datetime.now() + timedelta(days=1),
+                        room_type=room_type,
                         price=price,
                         currency=room_info.get('currency', 'EUR'),
-                        room_type=room_type,
-                        board_type=room_info.get('board_type')
+                        check_in_date=check_in_dt,
+                        check_out_date=check_out_dt,
+                        board_type=room_info.get('board_type'),
+                        source='booking.com'
                     )
-                    db.add(room_price)
-                    added_rooms.append(room_info)
-                    print(f"Added room: {room_type} - {price} EUR")
+                    db.add(price_data)
+                    added_prices.append(price_data)
+                    print(f"Added price: {room_type} - {price} EUR for {request.check_in_date}")
+                
                 except Exception as e:
                     print(f"Error adding room price data: {e}")
                     continue
             
             db.commit()
-            print(f"Added {len(added_rooms)} room options to database")
+            print(f"Added {len(added_prices)} price records to database")
         
         return {
             'success': True,
             'message': f'Successfully updated prices for {hotel.name}',
-            'price_data': price_data,
-            'rooms_added': len(added_rooms)
+            'prices_added': len(added_prices)
         }
         
     except Exception as e:

@@ -19,7 +19,10 @@ import {
   ListItemIcon,
   ListItemText,
   IconButton,
-  TextField
+  TextField,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails
 } from '@mui/material';
 import {
   LocationOn as LocationIcon,
@@ -35,7 +38,8 @@ import {
   Refresh as RefreshIcon,
   TrendingUp as TrendingUpIcon,
   AttachMoney as MoneyIcon,
-  CalendarToday as CalendarIcon
+  CalendarToday as CalendarIcon,
+  ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -78,17 +82,11 @@ const HotelDetails: React.FC = () => {
     enabled: !!id
   });
 
-  const { data: prices, isLoading: pricesLoading } = useQuery({
-    queryKey: ['hotel-prices', id],
-    queryFn: () => getHotelPrices(Number(id)),
-    enabled: !!id
-  });
-
   const updatePricesMutation = useMutation({
     mutationFn: ({ hotelId, checkIn, checkOut }: { hotelId: number; checkIn?: string; checkOut?: string }) =>
       updateHotelPrices(hotelId, checkIn, checkOut),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hotel-prices', id] });
+      queryClient.invalidateQueries({ queryKey: ['hotel', id] });
       setDateError(''); // Clear any date errors on success
     },
     onError: (error) => {
@@ -300,28 +298,15 @@ const HotelDetails: React.FC = () => {
             </Tabs>
             
             <TabPanel value={tabValue} index={0}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">Current Rooms & Prices</Typography>
-                <Button
-                  variant="outlined"
-                  startIcon={<RefreshIcon />}
-                  onClick={handleUpdatePrices}
-                  disabled={updatePricesMutation.isPending}
-                >
-                  Update Prices
-                </Button>
-              </Box>
+              <Typography variant="h6" gutterBottom>Current Rooms & Prices</Typography>
               
-              {/* Date Selection */}
-              <Paper sx={{ p: 2, mb: 3 }}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Select Dates for Price Update
+              {/* Scraping Section */}
+              <Paper sx={{ p: 3, mb: 3 }}>
+                <Typography variant="subtitle1" gutterBottom>Scrape New Prices</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Enter dates to scrape current prices for this hotel
                 </Typography>
-                {dateError && (
-                  <Alert severity="error" sx={{ mb: 2 }}>
-                    {dateError}
-                  </Alert>
-                )}
+                
                 <Grid container spacing={2} alignItems="center">
                   <Grid item xs={12} sm={4}>
                     <TextField
@@ -330,6 +315,7 @@ const HotelDetails: React.FC = () => {
                       value={checkInDate}
                       onChange={(e) => handleDateChange('checkIn', e.target.value)}
                       fullWidth
+                      size="small"
                       InputLabelProps={{ shrink: true }}
                       error={!!dateError}
                     />
@@ -341,6 +327,7 @@ const HotelDetails: React.FC = () => {
                       value={checkOutDate}
                       onChange={(e) => handleDateChange('checkOut', e.target.value)}
                       fullWidth
+                      size="small"
                       InputLabelProps={{ shrink: true }}
                       error={!!dateError}
                     />
@@ -350,51 +337,57 @@ const HotelDetails: React.FC = () => {
                       variant="contained"
                       startIcon={<RefreshIcon />}
                       onClick={handleUpdatePrices}
-                      disabled={updatePricesMutation.isPending}
+                      disabled={updatePricesMutation.isPending || !checkInDate || !checkOutDate}
                       fullWidth
                     >
-                      {updatePricesMutation.isPending ? 'Updating...' : 'Update Prices'}
+                      {updatePricesMutation.isPending ? 'Scraping...' : 'Scrape Prices'}
                     </Button>
                   </Grid>
                 </Grid>
+                
+                {dateError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    {dateError}
+                  </Alert>
+                )}
+                
+                {updatePricesMutation.isSuccess && (
+                  <Alert severity="success" sx={{ mt: 2 }}>
+                    Successfully scraped {updatePricesMutation.data?.prices_added || 0} new price records!
+                  </Alert>
+                )}
               </Paper>
-              
-              {updatePricesMutation.isPending && (
-                <Box display="flex" justifyContent="center" mb={2}>
-                  <CircularProgress />
-                </Box>
-              )}
-              
-              {pricesLoading ? (
-                <CircularProgress />
-              ) : prices && prices.length > 0 ? (
+
+              {/* Current Prices Display */}
+              <Typography variant="subtitle1" gutterBottom>Recent Prices</Typography>
+              {hotel.prices && hotel.prices.length > 0 ? (
                 <Grid container spacing={2}>
-                  {prices
-                    .filter(price => price.room_type) // Only show prices with room types
+                  {hotel.prices
+                    .sort((a, b) => new Date(b.scraped_at).getTime() - new Date(a.scraped_at).getTime())
+                    .slice(0, 6) // Show only the 6 most recent prices
                     .map((price) => (
                       <Grid item xs={12} sm={6} md={4} key={price.id}>
                         <Card variant="outlined">
                           <CardContent>
-                            <Typography variant="h6" gutterBottom>
-                              {price.room_type || 'Standard Room'}
+                            <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                              <Typography variant="h6" color="primary">
+                                {formatPrice(price.price, price.currency)}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {formatDate(price.scraped_at)}
+                              </Typography>
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                              {price.room_type}
                             </Typography>
-                            <Typography variant="h4" color="primary" gutterBottom>
-                              {formatPrice(price.price, price.currency)}
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                              For: {formatDate(price.check_in_date)} - {formatDate(price.check_out_date)}
                             </Typography>
                             {price.board_type && (
-                              <Chip 
-                                label={price.board_type} 
-                                size="small" 
-                                variant="outlined" 
-                                sx={{ mb: 1 }}
-                              />
+                              <Typography variant="body2" color="text.secondary">
+                                {price.board_type}
+                              </Typography>
                             )}
-                            <Typography variant="body2" color="text.secondary">
-                              {formatDate(price.check_in_date)} - {formatDate(price.check_out_date)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" display="block">
-                              Updated: {formatDate(price.scraped_at)}
-                            </Typography>
                           </CardContent>
                         </Card>
                       </Grid>
@@ -402,99 +395,68 @@ const HotelDetails: React.FC = () => {
                 </Grid>
               ) : (
                 <Alert severity="info">
-                  No current room prices available. Select dates and click "Update Prices" to fetch the latest rates.
+                  No prices have been scraped for this hotel yet. Use the form above to scrape current prices.
                 </Alert>
               )}
             </TabPanel>
             
             <TabPanel value={tabValue} index={1}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">Price History</Typography>
-                <Button
-                  variant="outlined"
-                  startIcon={<RefreshIcon />}
-                  onClick={handleUpdatePrices}
-                  disabled={updatePricesMutation.isPending}
-                >
-                  Update Prices
-                </Button>
-              </Box>
-              
-              {/* Date Selection for Price History */}
-              <Paper sx={{ p: 2, mb: 3 }}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Add New Price Record
-                </Typography>
-                {dateError && (
-                  <Alert severity="error" sx={{ mb: 1 }}>
-                    {dateError}
-                  </Alert>
+              <Typography variant="h6" gutterBottom>Price History by Room Type</Typography>
+                {hotel.prices && hotel.prices.length > 0 ? (
+                    <Box>
+                        {/* Group prices by room type */}
+                        {(() => {
+                            const pricesByRoomType: { [key: string]: typeof hotel.prices } = {};
+                            hotel.prices.forEach(price => {
+                                const roomType = price.room_type || 'Unknown Room Type';
+                                if (!pricesByRoomType[roomType]) {
+                                    pricesByRoomType[roomType] = [];
+                                }
+                                pricesByRoomType[roomType].push(price);
+                            });
+                            
+                            return Object.entries(pricesByRoomType).map(([roomType, prices]) => (
+                                <Accordion key={roomType} defaultExpanded>
+                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                        <Typography variant="subtitle1">{roomType}</Typography>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                        <Grid container spacing={2}>
+                                            {prices
+                                                .sort((a, b) => new Date(b.scraped_at).getTime() - new Date(a.scraped_at).getTime())
+                                                .map((price) => (
+                                                    <Grid item xs={12} sm={6} md={4} key={price.id}>
+                                                        <Card variant="outlined" sx={{ height: '100%' }}>
+                                                            <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                                                <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                                                                    <Typography variant="h6" color="primary">{formatPrice(price.price, price.currency)}</Typography>
+                                                                    <Typography variant="caption" color="text.secondary">{formatDate(price.scraped_at)}</Typography>
+                                                                </Box>
+                                                                <Typography variant="body2" color="text.secondary" gutterBottom>
+                                                                    For: {formatDate(price.check_in_date)} - {formatDate(price.check_out_date)}
+                                                                </Typography>
+                                                                {price.board_type && (
+                                                                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                                                                        Board: {price.board_type}
+                                                                    </Typography>
+                                                                )}
+                                                                <Box sx={{ flexGrow: 1 }} />
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    Source: {price.source}
+                                                                </Typography>
+                                                            </CardContent>
+                                                        </Card>
+                                                    </Grid>
+                                                ))}
+                                        </Grid>
+                                    </AccordionDetails>
+                                </Accordion>
+                            ));
+                        })()}
+                    </Box>
+                ) : (
+                    <Alert severity="info">No prices have been scraped for this hotel yet.</Alert>
                 )}
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      label="Check-in Date"
-                      type="date"
-                      value={checkInDate}
-                      onChange={(e) => handleDateChange('checkIn', e.target.value)}
-                      fullWidth
-                      InputLabelProps={{ shrink: true }}
-                      error={!!dateError}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      label="Check-out Date"
-                      type="date"
-                      value={checkOutDate}
-                      onChange={(e) => handleDateChange('checkOut', e.target.value)}
-                      fullWidth
-                      InputLabelProps={{ shrink: true }}
-                      error={!!dateError}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <Button
-                      variant="contained"
-                      startIcon={<RefreshIcon />}
-                      onClick={handleUpdatePrices}
-                      disabled={updatePricesMutation.isPending}
-                      fullWidth
-                    >
-                      {updatePricesMutation.isPending ? 'Updating...' : 'Add Price Record'}
-                    </Button>
-                  </Grid>
-                </Grid>
-              </Paper>
-              
-              {updatePricesMutation.isPending && (
-                <Box display="flex" justifyContent="center" mb={2}>
-                  <CircularProgress />
-                </Box>
-              )}
-              
-              {pricesLoading ? (
-                <CircularProgress />
-              ) : prices && prices.length > 0 ? (
-                <List>
-                  {prices.map((price) => (
-                    <ListItem key={price.id} divider>
-                      <ListItemIcon>
-                        <MoneyIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={formatPrice(price.price, price.currency)}
-                        secondary={`${formatDate(price.check_in_date)} - ${formatDate(price.check_out_date)}`}
-                      />
-                      <Typography variant="caption" color="text.secondary">
-                        {formatDate(price.scraped_at)}
-                      </Typography>
-                    </ListItem>
-                  ))}
-                </List>
-              ) : (
-                <Alert severity="info">No price history available</Alert>
-              )}
             </TabPanel>
             
             <TabPanel value={tabValue} index={2}>
@@ -602,30 +564,10 @@ const HotelDetails: React.FC = () => {
                 Hotel Stats
               </Typography>
               <List dense>
-                <ListItem>
-                  <ListItemText
-                    primary="Added"
-                    secondary={formatDate(hotel.created_at)}
-                  />
-                </ListItem>
-                <ListItem>
-                  <ListItemText
-                    primary="Last Updated"
-                    secondary={hotel.updated_at ? formatDate(hotel.updated_at) : 'N/A'}
-                  />
-                </ListItem>
-                <ListItem>
-                  <ListItemText
-                    primary="Price Records"
-                    secondary={prices ? prices.length : 0}
-                  />
-                </ListItem>
-                <ListItem>
-                  <ListItemText
-                    primary="Amenities"
-                    secondary={hotel.amenities ? hotel.amenities.length : 0}
-                  />
-                </ListItem>
+                <ListItem><ListItemText primary="Added" secondary={'N/A'} /></ListItem>
+                <ListItem><ListItemText primary="Last Updated" secondary={'N/A'} /></ListItem>
+                <ListItem><ListItemText primary="Price Records" secondary={hotel.prices ? hotel.prices.length : 0} /></ListItem>
+                <ListItem><ListItemText primary="Amenities" secondary={hotel.amenities ? hotel.amenities.length : 0} /></ListItem>
               </List>
             </CardContent>
           </Card>
