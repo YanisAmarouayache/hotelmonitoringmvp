@@ -39,11 +39,12 @@ import {
   TrendingUp as TrendingUpIcon,
   AttachMoney as MoneyIcon,
   CalendarToday as CalendarIcon,
-  ExpandMore as ExpandMoreIcon
+  ExpandMore as ExpandMoreIcon,
+  DateRange as DateRangeIcon
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getHotel, getHotelPrices, updateHotelPrices } from '../api/hotels';
+import { getHotel, getHotelPrices, scrapeDateRange } from '../api/hotels';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -74,6 +75,12 @@ const HotelDetails: React.FC = () => {
   const [checkOutDate, setCheckOutDate] = useState('');
   const [dateError, setDateError] = useState('');
   
+  // Date range scraping state
+  const [rangeStartDate, setRangeStartDate] = useState('');
+  const [rangeEndDate, setRangeEndDate] = useState('');
+  const [rangeDateError, setRangeDateError] = useState('');
+  const [showRangeScraping, setShowRangeScraping] = useState(false);
+  
   const queryClient = useQueryClient();
 
   const { data: hotel, isLoading: hotelLoading, error: hotelError } = useQuery({
@@ -82,15 +89,16 @@ const HotelDetails: React.FC = () => {
     enabled: !!id
   });
 
-  const updatePricesMutation = useMutation({
-    mutationFn: ({ hotelId, checkIn, checkOut }: { hotelId: number; checkIn?: string; checkOut?: string }) =>
-      updateHotelPrices(hotelId, checkIn, checkOut),
-    onSuccess: () => {
+  const scrapeRangeMutation = useMutation({
+    mutationFn: ({ hotelId, startDate, endDate }: { hotelId: number; startDate: string; endDate: string }) =>
+      scrapeDateRange(hotelId, startDate, endDate),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['hotel', id] });
-      setDateError(''); // Clear any date errors on success
+      setRangeDateError(''); // Clear any date errors on success
+      console.log('Date range scraping completed:', data);
     },
     onError: (error) => {
-      console.error('Failed to update prices:', error);
+      console.error('Failed to scrape date range:', error);
     }
   });
 
@@ -134,18 +142,28 @@ const HotelDetails: React.FC = () => {
     return true;
   };
 
-  const handleUpdatePrices = () => {
+  const handleScrapeDateRange = () => {
     if (!validateDates()) {
       return;
     }
     
     if (hotel) {
-      updatePricesMutation.mutate({
+      scrapeRangeMutation.mutate({
         hotelId: hotel.id,
-        checkIn: checkInDate || undefined,
-        checkOut: checkOutDate || undefined
+        startDate: checkInDate,
+        endDate: checkOutDate
       });
     }
+  };
+
+  // Clear range date error when dates change
+  const handleRangeDateChange = (field: 'start' | 'end', value: string) => {
+    if (field === 'start') {
+      setRangeStartDate(value);
+    } else {
+      setRangeEndDate(value);
+    }
+    setRangeDateError(''); // Clear error when user changes dates
   };
 
   // Set default dates (tomorrow and day after tomorrow)
@@ -157,6 +175,15 @@ const HotelDetails: React.FC = () => {
     
     setCheckInDate(tomorrow.toISOString().split('T')[0]);
     setCheckOutDate(dayAfterTomorrow.toISOString().split('T')[0]);
+    
+    // Set default range dates (next week)
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const nextWeekPlus5 = new Date();
+    nextWeekPlus5.setDate(nextWeekPlus5.getDate() + 12);
+    
+    setRangeStartDate(nextWeek.toISOString().split('T')[0]);
+    setRangeEndDate(nextWeekPlus5.toISOString().split('T')[0]);
   }, []);
 
   const getAmenityIcon = (amenity: string) => {
@@ -173,7 +200,7 @@ const HotelDetails: React.FC = () => {
 
   const formatPrice = (price: number | null, currency: string = 'EUR') => {
     if (price === null) return 'N/A';
-    return `${price} ${currency}`;
+    return `${Math.floor(price*100)/100} ${currency}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -292,6 +319,7 @@ const HotelDetails: React.FC = () => {
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="hotel details tabs">
               <Tab label="Current Rooms & Prices" />
               <Tab label="Price History" />
+              <Tab label="Prices by Date" />
               <Tab label="Analytics" />
               <Tab label="Competitors" />
               <Tab label="Settings" />
@@ -302,9 +330,9 @@ const HotelDetails: React.FC = () => {
               
               {/* Scraping Section */}
               <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="subtitle1" gutterBottom>Scrape New Prices</Typography>
+                <Typography variant="subtitle1" gutterBottom>Update Prices for Date Range</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Enter dates to scrape current prices for this hotel
+                  Enter dates to update prices for this hotel across the specified range
                 </Typography>
                 
                 <Grid container spacing={2} alignItems="center">
@@ -336,11 +364,11 @@ const HotelDetails: React.FC = () => {
                     <Button
                       variant="contained"
                       startIcon={<RefreshIcon />}
-                      onClick={handleUpdatePrices}
-                      disabled={updatePricesMutation.isPending || !checkInDate || !checkOutDate}
+                      onClick={handleScrapeDateRange}
+                      disabled={scrapeRangeMutation.isPending || !checkInDate || !checkOutDate}
                       fullWidth
                     >
-                      {updatePricesMutation.isPending ? 'Scraping...' : 'Scrape Prices'}
+                      {scrapeRangeMutation.isPending ? 'Updating...' : 'Update Prices'}
                     </Button>
                   </Grid>
                 </Grid>
@@ -351,9 +379,112 @@ const HotelDetails: React.FC = () => {
                   </Alert>
                 )}
                 
-                {updatePricesMutation.isSuccess && (
+                {scrapeRangeMutation.isSuccess && scrapeRangeMutation.data && (
                   <Alert severity="success" sx={{ mt: 2 }}>
-                    Successfully scraped {updatePricesMutation.data?.prices_added || 0} new price records!
+                    <Typography variant="subtitle2" gutterBottom>
+                      Date Range Updating Completed!
+                    </Typography>
+                    <Typography variant="body2">
+                      Successfully updated {scrapeRangeMutation.data.results?.successful_scrapes || 0} days
+                      ({scrapeRangeMutation.data.results?.failed_scrapes || 0} failed)
+                    </Typography>
+                    <Typography variant="body2">
+                      Total prices added: {scrapeRangeMutation.data.results?.total_prices_added || 0}
+                    </Typography>
+                  </Alert>
+                )}
+                
+                {scrapeRangeMutation.isError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    Failed to update date range: {scrapeRangeMutation.error instanceof Error 
+                      ? scrapeRangeMutation.error.message 
+                      : 'Unknown error'
+                    }
+                  </Alert>
+                )}
+              </Paper>
+
+              {/* Date Range Scraping Section */}
+              <Paper sx={{ p: 3, mb: 3 }}>
+                <Box display="flex" alignItems="center" gap={1} mb={2}>
+                  <DateRangeIcon color="primary" />
+                  <Typography variant="subtitle1">Scrape Daily Prices (Date Range)</Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Scrape prices for each day in a date range. This will create price records for consecutive 1-night stays.
+                </Typography>
+                
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={3}>
+                    <TextField
+                      label="Start Date"
+                      type="date"
+                      value={rangeStartDate}
+                      onChange={(e) => handleRangeDateChange('start', e.target.value)}
+                      fullWidth
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      error={!!rangeDateError}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <TextField
+                      label="End Date"
+                      type="date"
+                      value={rangeEndDate}
+                      onChange={(e) => handleRangeDateChange('end', e.target.value)}
+                      fullWidth
+                      size="small"
+                      InputLabelProps={{ shrink: true }}
+                      error={!!rangeDateError}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      startIcon={<DateRangeIcon />}
+                      onClick={handleScrapeDateRange}
+                      disabled={scrapeRangeMutation.isPending || !rangeStartDate || !rangeEndDate}
+                      fullWidth
+                    >
+                      {scrapeRangeMutation.isPending ? 'Scraping Range...' : 'Scrape Date Range'}
+                    </Button>
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <Typography variant="caption" color="text.secondary">
+                      Max 30 days
+                    </Typography>
+                  </Grid>
+                </Grid>
+                
+                {rangeDateError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    {rangeDateError}
+                  </Alert>
+                )}
+                
+                {scrapeRangeMutation.isSuccess && scrapeRangeMutation.data && (
+                  <Alert severity="success" sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Date Range Scraping Completed!
+                    </Typography>
+                    <Typography variant="body2">
+                      Successfully scraped {scrapeRangeMutation.data.results?.successful_scrapes || 0} days
+                      ({scrapeRangeMutation.data.results?.failed_scrapes || 0} failed)
+                    </Typography>
+                    <Typography variant="body2">
+                      Total prices added: {scrapeRangeMutation.data.results?.total_prices_added || 0}
+                    </Typography>
+                  </Alert>
+                )}
+                
+                {scrapeRangeMutation.isError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    Failed to update date range: {scrapeRangeMutation.error instanceof Error 
+                      ? scrapeRangeMutation.error.message 
+                      : 'Unknown error'
+                    }
                   </Alert>
                 )}
               </Paper>
@@ -361,38 +492,139 @@ const HotelDetails: React.FC = () => {
               {/* Current Prices Display */}
               <Typography variant="subtitle1" gutterBottom>Recent Prices</Typography>
               {hotel.prices && hotel.prices.length > 0 ? (
-                <Grid container spacing={2}>
-                  {hotel.prices
-                    .sort((a, b) => new Date(b.scraped_at).getTime() - new Date(a.scraped_at).getTime())
-                    .slice(0, 6) // Show only the 6 most recent prices
-                    .map((price) => (
-                      <Grid item xs={12} sm={6} md={4} key={price.id}>
-                        <Card variant="outlined">
-                          <CardContent>
-                            <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
-                              <Typography variant="h6" color="primary">
-                                {formatPrice(price.price, price.currency)}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {formatDate(price.scraped_at)}
+                <Box>
+                  {/* Summary stats */}
+                  <Paper sx={{ p: 2, mb: 3 }}>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={3}>
+                        <Box textAlign="center">
+                          <Typography variant="h4" color="primary">
+                            {hotel.prices.length}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Total Price Records
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <Box textAlign="center">
+                          <Typography variant="h4" color="secondary">
+                            {new Set(hotel.prices.map(p => p.check_in_date.split('T')[0])).size}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Unique Dates
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <Box textAlign="center">
+                          <Typography variant="h4" color="info.main">
+                            {new Set(hotel.prices.map(p => p.room_type)).size}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Room Types
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <Box textAlign="center">
+                          <Typography variant="h4" color="success.main">
+                            {formatPrice(
+                              hotel.prices.reduce((sum, p) => sum + (p.price || 0), 0) / hotel.prices.length,
+                              'EUR'
+                            )}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Average Price
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+
+                  {/* Recent prices by date */}
+                  {(() => {
+                    const pricesByDate: { [key: string]: typeof hotel.prices } = {};
+                    
+                    // Group prices by check-in date
+                    hotel.prices.forEach(price => {
+                      const checkInDate = price.check_in_date.split('T')[0];
+                      if (!pricesByDate[checkInDate]) {
+                        pricesByDate[checkInDate] = [];
+                      }
+                      pricesByDate[checkInDate].push(price);
+                    });
+
+                    // Get the 3 most recent dates
+                    const sortedDates = Object.keys(pricesByDate)
+                      .sort()
+                      .reverse()
+                      .slice(0, 3);
+                    
+                    return sortedDates.map((date) => {
+                      const datePrices = pricesByDate[date];
+                      const nextDay = new Date(date);
+                      nextDay.setDate(nextDay.getDate() + 1);
+                      const nextDayStr = nextDay.toISOString().split('T')[0];
+                      
+                      return (
+                        <Paper key={date} sx={{ p: 2, mb: 2 }}>
+                          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                            <Typography variant="h6">
+                              {formatDate(date)} - {formatDate(nextDayStr)}
+                            </Typography>
+                            <Chip 
+                              label={`${datePrices.length} prices`} 
+                              color="primary" 
+                              size="small" 
+                            />
+                          </Box>
+                          
+                          <Grid container spacing={2}>
+                            {datePrices
+                              .sort((a, b) => new Date(b.scraped_at).getTime() - new Date(a.scraped_at).getTime())
+                              .slice(0, 6) // Show max 6 prices per date
+                              .map((price) => (
+                                <Grid item xs={12} sm={6} md={4} key={price.id}>
+                                  <Card variant="outlined">
+                                    <CardContent>
+                                      <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                                        <Typography variant="h6" color="primary">
+                                          {formatPrice(price.price, price.currency)}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {formatDate(price.scraped_at)}
+                                        </Typography>
+                                      </Box>
+                                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                                        {price.room_type}
+                                      </Typography>
+                                      {price.board_type && (
+                                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                                          {price.board_type}
+                                        </Typography>
+                                      )}
+                                      <Typography variant="caption" color="text.secondary">
+                                        Source: {price.source}
+                                      </Typography>
+                                    </CardContent>
+                                  </Card>
+                                </Grid>
+                              ))}
+                          </Grid>
+                          
+                          {datePrices.length > 6 && (
+                            <Box mt={2} textAlign="center">
+                              <Typography variant="body2" color="text.secondary">
+                                +{datePrices.length - 6} more prices for this date
                               </Typography>
                             </Box>
-                            <Typography variant="body2" color="text.secondary" gutterBottom>
-                              {price.room_type}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" gutterBottom>
-                              For: {formatDate(price.check_in_date)} - {formatDate(price.check_out_date)}
-                            </Typography>
-                            {price.board_type && (
-                              <Typography variant="body2" color="text.secondary">
-                                {price.board_type}
-                              </Typography>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    ))}
-                </Grid>
+                          )}
+                        </Paper>
+                      );
+                    });
+                  })()}
+                </Box>
               ) : (
                 <Alert severity="info">
                   No prices have been scraped for this hotel yet. Use the form above to scrape current prices.
@@ -461,6 +693,296 @@ const HotelDetails: React.FC = () => {
             
             <TabPanel value={tabValue} index={2}>
               <Typography variant="h6" gutterBottom>
+                Prices by Date
+              </Typography>
+              {hotel.prices && hotel.prices.length > 0 ? (
+                <Box>
+                  {/* Date range filter */}
+                  <Paper sx={{ p: 2, mb: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Filter by Date Range
+                    </Typography>
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          label="From Date"
+                          type="date"
+                          size="small"
+                          InputLabelProps={{ shrink: true }}
+                          fullWidth
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          label="To Date"
+                          type="date"
+                          size="small"
+                          InputLabelProps={{ shrink: true }}
+                          fullWidth
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={4}>
+                        <Button variant="outlined" size="small" fullWidth>
+                          Apply Filter
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+
+                  {/* Price Calendar View */}
+                  <Paper sx={{ p: 2, mb: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Price Calendar View
+                    </Typography>
+                    {(() => {
+                      const pricesByDate: { [key: string]: typeof hotel.prices } = {};
+                      
+                      // Group prices by check-in date
+                      hotel.prices.forEach(price => {
+                        const checkInDate = price.check_in_date.split('T')[0];
+                        if (!pricesByDate[checkInDate]) {
+                          pricesByDate[checkInDate] = [];
+                        }
+                        pricesByDate[checkInDate].push(price);
+                      });
+
+                      // Get all dates and sort them
+                      const allDates = Object.keys(pricesByDate).sort();
+                      
+                      if (allDates.length === 0) {
+                        return <Typography variant="body2" color="text.secondary">No price data available</Typography>;
+                      }
+
+                      // Calculate price statistics for color coding
+                      const allPrices = hotel.prices.map(p => p.price).filter(p => p !== null);
+                      const minPrice = Math.min(...allPrices);
+                      const maxPrice = Math.max(...allPrices);
+                      const priceRange = maxPrice - minPrice;
+
+                      return (
+                        <Grid container spacing={1}>
+                          {allDates.map((date) => {
+                            const datePrices = pricesByDate[date];
+                            const avgPrice = datePrices.reduce((sum, p) => sum + (p.price || 0), 0) / datePrices.length;
+                            
+                            // Calculate color intensity based on price (higher price = darker color)
+                            const priceRatio = priceRange > 0 ? (avgPrice - minPrice) / priceRange : 0.5;
+                            const colorIntensity = Math.max(0.1, Math.min(0.9, priceRatio));
+                            
+                            return (
+                              <Grid item xs={6} sm={4} md={3} lg={2} key={date}>
+                                <Card 
+                                  variant="outlined" 
+                                  sx={{ 
+                                    p: 1, 
+                                    textAlign: 'center',
+                                    backgroundColor: `rgba(25, 118, 210, ${colorIntensity * 0.2})`,
+                                    borderColor: `rgba(25, 118, 210, ${colorIntensity * 0.5})`
+                                  }}
+                                >
+                                  <Typography variant="caption" color="text.secondary" display="block">
+                                    {formatDate(date)}
+                                  </Typography>
+                                  <Typography variant="body2" fontWeight="bold" color="primary">
+                                    {formatPrice(avgPrice, 'EUR')}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {datePrices.length} prices
+                                  </Typography>
+                                </Card>
+                              </Grid>
+                            );
+                          })}
+                        </Grid>
+                      );
+                    })()}
+                  </Paper>
+
+                  {/* Detailed Price Breakdown */}
+                  <Paper sx={{ p: 2, mb: 3 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Detailed Price Breakdown by Date
+                    </Typography>
+                    {(() => {
+                      const pricesByDate: { [key: string]: typeof hotel.prices } = {};
+                      
+                      // Group prices by check-in date
+                      hotel.prices.forEach(price => {
+                        const checkInDate = price.check_in_date.split('T')[0];
+                        if (!pricesByDate[checkInDate]) {
+                          pricesByDate[checkInDate] = [];
+                        }
+                        pricesByDate[checkInDate].push(price);
+                      });
+
+                      // Sort dates in ascending order
+                      const sortedDates = Object.keys(pricesByDate).sort();
+                      
+                      return sortedDates.map((date) => {
+                        const datePrices = pricesByDate[date];
+                        const nextDay = new Date(date);
+                        nextDay.setDate(nextDay.getDate() + 1);
+                        const nextDayStr = nextDay.toISOString().split('T')[0];
+                        
+                        // Group by room type for this date
+                        const pricesByRoomType: { [key: string]: typeof hotel.prices } = {};
+                        datePrices.forEach(price => {
+                          const roomType = price.room_type || 'Unknown Room Type';
+                          if (!pricesByRoomType[roomType]) {
+                            pricesByRoomType[roomType] = [];
+                          }
+                          pricesByRoomType[roomType].push(price);
+                        });
+
+                        return (
+                          <Accordion key={date} defaultExpanded>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                              <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
+                                <Typography variant="subtitle1">
+                                  {formatDate(date)} - {formatDate(nextDayStr)}
+                                </Typography>
+                                <Box display="flex" gap={1}>
+                                  <Chip 
+                                    label={`${datePrices.length} prices`} 
+                                    size="small" 
+                                    color="primary" 
+                                    variant="outlined" 
+                                  />
+                                  <Chip 
+                                    label={`${Object.keys(pricesByRoomType).length} room types`} 
+                                    size="small" 
+                                    color="secondary" 
+                                    variant="outlined" 
+                                  />
+                                </Box>
+                              </Box>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                              <Grid container spacing={2}>
+                                {Object.entries(pricesByRoomType).map(([roomType, prices]) => {
+                                  // Get the most recent price for this room type on this date
+                                  const mostRecentPrice = prices.sort((a, b) => 
+                                    new Date(b.scraped_at).getTime() - new Date(a.scraped_at).getTime()
+                                  )[0];
+                                  
+                                  // Calculate price range for this room type
+                                  const priceValues = prices.map(p => p.price).filter(p => p !== null);
+                                  const minPrice = Math.min(...priceValues);
+                                  const maxPrice = Math.max(...priceValues);
+                                  const avgPrice = priceValues.reduce((sum, price) => sum + price, 0) / priceValues.length;
+                                  
+                                  return (
+                                    <Grid item xs={12} sm={6} md={4} key={roomType}>
+                                      <Card variant="outlined" sx={{ height: '100%' }}>
+                                        <CardContent>
+                                          <Typography variant="h6" color="primary" gutterBottom>
+                                            {roomType}
+                                          </Typography>
+                                          
+                                          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                            <Typography variant="h5" color="primary" fontWeight="bold">
+                                              {formatPrice(mostRecentPrice.price, mostRecentPrice.currency)}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                              Latest
+                                            </Typography>
+                                          </Box>
+                                          
+                                          {priceValues.length > 1 && (
+                                            <Box mb={2}>
+                                              <Typography variant="body2" color="text.secondary" gutterBottom>
+                                                Price Range:
+                                              </Typography>
+                                              <Box display="flex" gap={1} flexWrap="wrap">
+                                                <Chip 
+                                                  label={`Min: ${formatPrice(minPrice, mostRecentPrice.currency)}`} 
+                                                  size="small" 
+                                                  color="success" 
+                                                  variant="outlined" 
+                                                />
+                                                <Chip 
+                                                  label={`Max: ${formatPrice(maxPrice, mostRecentPrice.currency)}`} 
+                                                  size="small" 
+                                                  color="error" 
+                                                  variant="outlined" 
+                                                />
+                                                <Chip 
+                                                  label={`Avg: ${formatPrice(avgPrice, mostRecentPrice.currency)}`} 
+                                                  size="small" 
+                                                  color="info" 
+                                                  variant="outlined" 
+                                                />
+                                              </Box>
+                                            </Box>
+                                          )}
+                                          
+                                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                                            {mostRecentPrice.board_type && `Board: ${mostRecentPrice.board_type}`}
+                                          </Typography>
+                                          
+                                          <Typography variant="caption" color="text.secondary">
+                                            Last updated: {formatDate(mostRecentPrice.scraped_at)}
+                                          </Typography>
+                                          
+                                          {prices.length > 1 && (
+                                            <Box mt={1}>
+                                              <Typography variant="caption" color="text.secondary">
+                                                {prices.length} price records for this room type
+                                              </Typography>
+                                            </Box>
+                                          )}
+                                        </CardContent>
+                                      </Card>
+                                    </Grid>
+                                  );
+                                })}
+                              </Grid>
+                              
+                              {/* Show all price history for this date */}
+                              <Box mt={3}>
+                                <Typography variant="subtitle2" gutterBottom>
+                                  Price History for {formatDate(date)}
+                                </Typography>
+                                <Grid container spacing={1}>
+                                  {datePrices
+                                    .sort((a, b) => new Date(b.scraped_at).getTime() - new Date(a.scraped_at).getTime())
+                                    .map((price) => (
+                                      <Grid item xs={12} sm={6} md={4} key={price.id}>
+                                        <Card variant="outlined" sx={{ p: 1 }}>
+                                          <Box display="flex" justifyContent="space-between" alignItems="center">
+                                            <Box>
+                                              <Typography variant="body2" fontWeight="bold">
+                                                {price.room_type}
+                                              </Typography>
+                                              <Typography variant="body2" color="primary">
+                                                {formatPrice(price.price, price.currency)}
+                                              </Typography>
+                                            </Box>
+                                            <Typography variant="caption" color="text.secondary">
+                                              {formatDate(price.scraped_at)}
+                                            </Typography>
+                                          </Box>
+                                        </Card>
+                                      </Grid>
+                                    ))}
+                                </Grid>
+                              </Box>
+                            </AccordionDetails>
+                          </Accordion>
+                        );
+                      });
+                    })()}
+                  </Paper>
+                </Box>
+              ) : (
+                <Alert severity="info">
+                  No prices have been scraped for this hotel yet. Use the scraping tools above to get price data.
+                </Alert>
+              )}
+            </TabPanel>
+            
+            <TabPanel value={tabValue} index={3}>
+              <Typography variant="h6" gutterBottom>
                 Analytics
               </Typography>
               <Alert severity="info">
@@ -469,7 +991,7 @@ const HotelDetails: React.FC = () => {
               </Alert>
             </TabPanel>
             
-            <TabPanel value={tabValue} index={3}>
+            <TabPanel value={tabValue} index={4}>
               <Typography variant="h6" gutterBottom>
                 Competitor Analysis
               </Typography>
@@ -479,7 +1001,7 @@ const HotelDetails: React.FC = () => {
               </Alert>
             </TabPanel>
             
-            <TabPanel value={tabValue} index={4}>
+            <TabPanel value={tabValue} index={5}>
               <Typography variant="h6" gutterBottom>
                 Hotel Settings
               </Typography>
@@ -501,7 +1023,7 @@ const HotelDetails: React.FC = () => {
               <Box display="flex" flexDirection="column" gap={2}>
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
-                    Update Prices for Specific Dates
+                    Update Prices for Date Range
                   </Typography>
                   {dateError && (
                     <Alert severity="error" sx={{ mb: 1 }}>
@@ -533,13 +1055,60 @@ const HotelDetails: React.FC = () => {
                   <Button
                     variant="contained"
                     startIcon={<RefreshIcon />}
-                    onClick={handleUpdatePrices}
-                    disabled={updatePricesMutation.isPending}
+                    onClick={handleScrapeDateRange}
+                    disabled={scrapeRangeMutation.isPending}
                     fullWidth
                   >
-                    {updatePricesMutation.isPending ? 'Updating...' : 'Update Prices'}
+                    {scrapeRangeMutation.isPending ? 'Updating...' : 'Update Prices'}
                   </Button>
                 </Box>
+                
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Update Daily Prices (Range)
+                  </Typography>
+                  {rangeDateError && (
+                    <Alert severity="error" sx={{ mb: 1 }}>
+                      {rangeDateError}
+                    </Alert>
+                  )}
+                  <TextField
+                    label="Start Date"
+                    type="date"
+                    value={rangeStartDate}
+                    onChange={(e) => handleRangeDateChange('start', e.target.value)}
+                    fullWidth
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ mb: 1 }}
+                    error={!!rangeDateError}
+                  />
+                  <TextField
+                    label="End Date"
+                    type="date"
+                    value={rangeEndDate}
+                    onChange={(e) => handleRangeDateChange('end', e.target.value)}
+                    fullWidth
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ mb: 1 }}
+                    error={!!rangeDateError}
+                  />
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    startIcon={<DateRangeIcon />}
+                    onClick={handleScrapeDateRange}
+                    disabled={scrapeRangeMutation.isPending}
+                    fullWidth
+                  >
+                    {scrapeRangeMutation.isPending ? 'Updating...' : 'Update Prices'}
+                  </Button>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                    Max 30 days
+                  </Typography>
+                </Box>
+                
                 <Button
                   variant="outlined"
                   startIcon={<TrendingUpIcon />}

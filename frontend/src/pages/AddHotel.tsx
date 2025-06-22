@@ -7,10 +7,6 @@ import {
   Paper,
   Alert,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Grid
 } from '@mui/material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,9 +17,7 @@ const AddHotel: React.FC = () => {
   const [formData, setFormData] = useState({
     booking_url: '',
     check_in_date: '',
-    check_out_date: '',
-    room_type: '',
-    board_type: ''
+    check_out_date: ''
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -50,13 +44,13 @@ const AddHotel: React.FC = () => {
         }
       }
       
+      successMessage += ' Range updating has been initiated for the specified dates.';
+      
       setSuccess(successMessage);
       setFormData({
         booking_url: '',
         check_in_date: '',
         check_out_date: '',
-        room_type: '',
-        board_type: ''
       });
       queryClient.invalidateQueries({ queryKey: ['hotels'] });
     },
@@ -103,8 +97,6 @@ const AddHotel: React.FC = () => {
       booking_url: formData.booking_url.trim(),
       check_in_date: formData.check_in_date,
       check_out_date: formData.check_out_date,
-      room_type: formData.room_type || undefined,
-      board_type: formData.board_type || undefined
     });
   };
 
@@ -118,6 +110,13 @@ const AddHotel: React.FC = () => {
         <Typography variant="h6" gutterBottom>
           Add New Hotel
         </Typography>
+        
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            <strong>Note:</strong> When you add a hotel, the system will automatically update prices for each day in the date range you specify below. 
+            This may take a few moments depending on the number of days.
+          </Typography>
+        </Alert>
         
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
           <Grid container spacing={3}>
@@ -141,13 +140,14 @@ const AddHotel: React.FC = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Check-in Date"
+                label="Range Start Date"
                 type="date"
                 value={formData.check_in_date}
                 onChange={(e) => handleInputChange('check_in_date', e.target.value)}
                 InputLabelProps={{
                   shrink: true,
                 }}
+                helperText="Start date for price updating"
                 required
               />
             </Grid>
@@ -155,52 +155,16 @@ const AddHotel: React.FC = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Check-out Date"
+                label="Range End Date"
                 type="date"
                 value={formData.check_out_date}
                 onChange={(e) => handleInputChange('check_out_date', e.target.value)}
                 InputLabelProps={{
                   shrink: true,
                 }}
+                helperText="End date for price updating"
                 required
               />
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Room Type</InputLabel>
-                <Select
-                  value={formData.room_type}
-                  label="Room Type"
-                  onChange={(e) => handleInputChange('room_type', e.target.value)}
-                >
-                  <MenuItem value="">Any</MenuItem>
-                  <MenuItem value="single">Single Room</MenuItem>
-                  <MenuItem value="double">Double Room</MenuItem>
-                  <MenuItem value="twin">Twin Room</MenuItem>
-                  <MenuItem value="triple">Triple Room</MenuItem>
-                  <MenuItem value="family">Family Room</MenuItem>
-                  <MenuItem value="suite">Suite</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Board Type</InputLabel>
-                <Select
-                  value={formData.board_type}
-                  label="Board Type"
-                  onChange={(e) => handleInputChange('board_type', e.target.value)}
-                >
-                  <MenuItem value="">Any</MenuItem>
-                  <MenuItem value="room_only">Room Only</MenuItem>
-                  <MenuItem value="bed_and_breakfast">Bed & Breakfast</MenuItem>
-                  <MenuItem value="half_board">Half Board</MenuItem>
-                  <MenuItem value="full_board">Full Board</MenuItem>
-                  <MenuItem value="all_inclusive">All Inclusive</MenuItem>
-                </Select>
-              </FormControl>
             </Grid>
             
             <Grid item xs={12}>
@@ -209,10 +173,10 @@ const AddHotel: React.FC = () => {
                 variant="contained"
                 size="large"
                 fullWidth
-                disabled={mutation.isPending || !formData.booking_url.trim() || !formData.check_in_date || !formData.check_out_date}
+                disabled={mutation.isPending}
                 startIcon={mutation.isPending ? <CircularProgress size={20} /> : null}
               >
-                {mutation.isPending ? 'Adding Hotel...' : 'Add Hotel'}
+                {mutation.isPending ? 'Adding Hotel & Updating Prices...' : 'Add Hotel & Update Date Range'}
               </Button>
             </Grid>
           </Grid>
@@ -240,8 +204,7 @@ const AddHotel: React.FC = () => {
           2. Copy the hotel's URL from your browser<br/>
           3. Paste it in the "Booking.com Hotel URL" field above<br/>
           4. Set check-in and check-out dates (required)<br/>
-          5. Optionally set room and board preferences<br/>
-          6. Click "Add Hotel" to scrape and store the hotel data
+          5. Click "Add Hotel" to update and store the hotel data
         </Typography>
       </Paper>
     </Box>

@@ -1,3 +1,13 @@
 frontend/node_modules
 backend/debug_html
-*.pyc
+backend/scraper/__pycache__/booking_scraper.cpython-311.pyc
+backend/app/routes/__pycache__/scraping.cpython-311.pyc
+backend/app/routes/__pycache__/hotels.cpython-311.pyc
+backend/app/routes/__pycache__/analytics.cpython-311.pyc
+backend/app/models/__pycache__/hotel.cpython-311.pyc
+backend/app/models/__pycache__/__init__.cpython-311.pyc
+backend/app/models/__pycache__/hotel.cpython-311.pyc
+backend/app/routes/__pycache__/analytics.cpython-311.pyc
+backend/app/routes/__pycache__/hotels.cpython-311.pyc
+backend/scraper/__pycache__/booking_scraper.cpython-311.pyc
+backend/app/routes/__pycache__/scraping.cpython-311.pyc

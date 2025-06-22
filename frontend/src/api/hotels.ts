@@ -76,19 +76,6 @@ export const addHotel = async (request: ScrapingRequest): Promise<ScrapingRespon
   return response.data;
 };
 
-// Update hotel prices
-export const updateHotelPrices = async (
-  hotelId: number,
-  checkInDate?: string,
-  checkOutDate?: string
-): Promise<{ success: boolean; prices_added?: number; message?: string }> => {
-  const response = await axios.post(`${API_BASE_URL}/scraping/update-prices/${hotelId}`, {
-    check_in_date: checkInDate,
-    check_out_date: checkOutDate
-  });
-  return response.data;
-};
-
 // Delete hotel
 export const deleteHotel = async (id: number): Promise<void> => {
   await axios.delete(`${API_BASE_URL}/hotels/${id}`);
@@ -97,5 +84,32 @@ export const deleteHotel = async (id: number): Promise<void> => {
 // Get hotel prices
 export const getHotelPrices = async (hotelId: number): Promise<HotelPrice[]> => {
   const response = await axios.get(`${API_BASE_URL}/hotels/${hotelId}/prices`);
+  return response.data;
+};
+
+// Scrape date range for hotel
+export const scrapeDateRange = async (
+  hotelId: number,
+  startDate: string,
+  endDate: string
+): Promise<{
+  success: boolean;
+  message?: string;
+  date_range?: {
+    start_date: string;
+    end_date: string;
+    total_days: number;
+  };
+  results?: {
+    successful_scrapes: number;
+    failed_scrapes: number;
+    total_prices_added: number;
+  };
+  error?: string;
+}> => {
+  const response = await axios.post(`${API_BASE_URL}/scraping/scrape-date-range/${hotelId}`, {
+    start_date: startDate,
+    end_date: endDate
+  });
   return response.data;
 }; 

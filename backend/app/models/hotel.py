@@ -104,8 +104,6 @@ class ScrapingRequest(BaseModel):
     booking_url: str
     check_in_date: Optional[str] = None
     check_out_date: Optional[str] = None
-    room_type: Optional[str] = None
-    board_type: Optional[str] = None
 
 class ScrapingResponse(BaseModel):
     success: bool

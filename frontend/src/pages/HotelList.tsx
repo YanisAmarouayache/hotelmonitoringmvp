@@ -32,18 +32,20 @@ import {
   Visibility as ViewIcon,
   TrendingUp as TrendingUpIcon,
   LocationOn as LocationIcon,
-  Star as StarIcon
+  Star as StarIcon,
+  DateRange as DateRangeIcon
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { getHotels, deleteHotel, updateHotelPrices, Hotel } from '../api/hotels';
+import { getHotels, deleteHotel, scrapeDateRange, Hotel } from '../api/hotels';
 
 const HotelList: React.FC = () => {
   const navigate = useNavigate();
   const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null);
-  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  const [checkInDate, setCheckInDate] = useState('');
-  const [checkOutDate, setCheckOutDate] = useState('');
+  const [rangeDialogOpen, setRangeDialogOpen] = useState(false);
+  const [rangeStartDate, setRangeStartDate] = useState('');
+  const [rangeEndDate, setRangeEndDate] = useState('');
+  const [rangeDateError, setRangeDateError] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
   
   const queryClient = useQueryClient();
@@ -76,13 +78,18 @@ const HotelList: React.FC = () => {
     }
   });
 
-  const updatePricesMutation = useMutation({
-    mutationFn: ({ hotelId, checkIn, checkOut }: { hotelId: number; checkIn?: string; checkOut?: string }) =>
-      updateHotelPrices(hotelId, checkIn, checkOut),
-    onSuccess: () => {
+  const scrapeRangeMutation = useMutation({
+    mutationFn: ({ hotelId, startDate, endDate }: { hotelId: number; startDate: string; endDate: string }) =>
+      scrapeDateRange(hotelId, startDate, endDate),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['hotels'] });
-      setUpdateDialogOpen(false);
+      setRangeDialogOpen(false);
       setSelectedHotel(null);
+      setRangeDateError('');
+      console.log('Date range scraping completed:', data);
+    },
+    onError: (error) => {
+      console.error('Failed to scrape date range:', error);
     }
   });
 
@@ -92,20 +99,68 @@ const HotelList: React.FC = () => {
     }
   };
 
-  const handleUpdatePrices = (hotel: Hotel) => {
+  const handleScrapeDateRange = (hotel: Hotel) => {
     setSelectedHotel(hotel);
-    setUpdateDialogOpen(true);
+    setRangeDialogOpen(true);
   };
 
-  const handleUpdatePricesSubmit = () => {
+  // Validate date range
+  const validateDateRange = () => {
+    if (!rangeStartDate || !rangeEndDate) {
+      setRangeDateError('Please select both start and end dates');
+      return false;
+    }
+    
+    const startDate = new Date(rangeStartDate);
+    const endDate = new Date(rangeEndDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (startDate < today) {
+      setRangeDateError('Start date cannot be in the past');
+      return false;
+    }
+    
+    if (endDate <= startDate) {
+      setRangeDateError('End date must be after start date');
+      return false;
+    }
+    
+    // Check if range is more than 30 days
+    const daysDiff = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
+    if (daysDiff > 30) {
+      setRangeDateError('Date range cannot exceed 30 days');
+      return false;
+    }
+    
+    setRangeDateError('');
+    return true;
+  };
+
+  const handleScrapeRangeSubmit = () => {
+    if (!validateDateRange()) {
+      return;
+    }
+    
     if (selectedHotel) {
-      updatePricesMutation.mutate({
+      scrapeRangeMutation.mutate({
         hotelId: selectedHotel.id,
-        checkIn: checkInDate || undefined,
-        checkOut: checkOutDate || undefined
+        startDate: rangeStartDate,
+        endDate: rangeEndDate
       });
     }
   };
+
+  // Set default dates
+  React.useEffect(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfterTomorrow = new Date();
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+    
+    setRangeStartDate(tomorrow.toISOString().split('T')[0]);
+    setRangeEndDate(dayAfterTomorrow.toISOString().split('T')[0]);
+  }, []);
 
   const formatPrice = (price: number | null, currency: string = 'EUR') => {
     if (price === null) return 'N/A';
@@ -219,7 +274,26 @@ const HotelList: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {formatPrice(null)} {/* TODO: Get current price */}
+                      {(() => {
+                        // Show recent prices if available
+                        if ((hotel as any).prices && (hotel as any).prices.length > 0) {
+                          // Get the most recent price
+                          const mostRecentPrice = (hotel as any).prices
+                            .sort((a: any, b: any) => new Date(b.scraped_at).getTime() - new Date(a.scraped_at).getTime())[0];
+                          
+                          return (
+                            <Box>
+                              <Typography variant="body2" fontWeight="bold">
+                                {formatPrice(mostRecentPrice.price, mostRecentPrice.currency)}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {formatDate(mostRecentPrice.check_in_date)}
+                              </Typography>
+                            </Box>
+                          );
+                        }
+                        return formatPrice(null);
+                      })()}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -229,13 +303,13 @@ const HotelList: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Box display="flex" gap={1}>
-                      <Tooltip title="Update Prices">
+                      <Tooltip title="Update Date Range">
                         <IconButton
                           size="small"
-                          onClick={() => handleUpdatePrices(hotel)}
-                          disabled={updatePricesMutation.isPending}
+                          onClick={() => handleScrapeDateRange(hotel)}
+                          disabled={scrapeRangeMutation.isPending}
                         >
-                          <RefreshIcon />
+                          <DateRangeIcon />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="View Details">
@@ -325,16 +399,57 @@ const HotelList: React.FC = () => {
                   <Typography variant="caption" color="text.secondary">
                     Added: {formatDate(hotel.created_at)}
                   </Typography>
+                  
+                  {/* Price summary if available */}
+                  {(hotel as any).prices && (hotel as any).prices.length > 0 && (
+                    <Box mt={1}>
+                      <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                        Recent Prices:
+                      </Typography>
+                      <Box display="flex" flexWrap="wrap" gap={0.5}>
+                        {(() => {
+                          // Group by check-in date and get the most recent price for each date
+                          const pricesByDate: { [key: string]: any } = {};
+                          (hotel as any).prices.forEach((price: any) => {
+                            const checkInDate = price.check_in_date.split('T')[0];
+                            if (!pricesByDate[checkInDate] || 
+                                new Date(price.scraped_at) > new Date(pricesByDate[checkInDate].scraped_at)) {
+                              pricesByDate[checkInDate] = price;
+                            }
+                          });
+                          
+                          // Get the 3 most recent dates
+                          const recentDates = Object.keys(pricesByDate)
+                            .sort()
+                            .reverse()
+                            .slice(0, 3);
+                          
+                          return recentDates.map((date) => {
+                            const price = pricesByDate[date];
+                            return (
+                              <Chip
+                                key={date}
+                                label={`${formatDate(date)}: ${formatPrice(price.price, price.currency)}`}
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                              />
+                            );
+                          });
+                        })()}
+                      </Box>
+                    </Box>
+                  )}
                 </CardContent>
                 
                 <CardActions>
                   <Button
                     size="small"
-                    startIcon={<RefreshIcon />}
-                    onClick={() => handleUpdatePrices(hotel)}
-                    disabled={updatePricesMutation.isPending}
+                    startIcon={<DateRangeIcon />}
+                    onClick={() => handleScrapeDateRange(hotel)}
+                    disabled={scrapeRangeMutation.isPending}
                   >
-                    Update Prices
+                    {scrapeRangeMutation.isPending ? 'Updating...' : 'Update Date Range'}
                   </Button>
                   <Button
                     size="small"
@@ -359,10 +474,10 @@ const HotelList: React.FC = () => {
         </Grid>
       )}
 
-      {/* Update Prices Dialog */}
-      <Dialog open={updateDialogOpen} onClose={() => setUpdateDialogOpen(false)} maxWidth="sm" fullWidth>
+      {/* Date Range Dialog */}
+      <Dialog open={rangeDialogOpen} onClose={() => setRangeDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          Update Prices for {selectedHotel?.name}
+          Update Date Range for {selectedHotel?.name}
         </DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
@@ -371,9 +486,9 @@ const HotelList: React.FC = () => {
                 <TextField
                   fullWidth
                   type="date"
-                  label="Check-in Date"
-                  value={checkInDate}
-                  onChange={(e) => setCheckInDate(e.target.value)}
+                  label="Start Date"
+                  value={rangeStartDate}
+                  onChange={(e) => setRangeStartDate(e.target.value)}
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
@@ -381,35 +496,32 @@ const HotelList: React.FC = () => {
                 <TextField
                   fullWidth
                   type="date"
-                  label="Check-out Date"
-                  value={checkOutDate}
-                  onChange={(e) => setCheckOutDate(e.target.value)}
+                  label="End Date"
+                  value={rangeEndDate}
+                  onChange={(e) => setRangeEndDate(e.target.value)}
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
             </Grid>
             
-            {updatePricesMutation.isError && (
+            {rangeDateError && (
               <Alert severity="error" sx={{ mt: 2 }}>
-                {updatePricesMutation.error instanceof Error 
-                  ? updatePricesMutation.error.message 
-                  : 'Failed to update prices'
-                }
+                {rangeDateError}
               </Alert>
             )}
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setUpdateDialogOpen(false)}>
+          <Button onClick={() => setRangeDialogOpen(false)}>
             Cancel
           </Button>
           <Button
-            onClick={handleUpdatePricesSubmit}
+            onClick={handleScrapeRangeSubmit}
             variant="contained"
-            disabled={updatePricesMutation.isPending}
-            startIcon={updatePricesMutation.isPending ? <CircularProgress size={16} /> : <TrendingUpIcon />}
+            disabled={scrapeRangeMutation.isPending}
+            startIcon={scrapeRangeMutation.isPending ? <CircularProgress size={16} /> : <DateRangeIcon />}
           >
-            {updatePricesMutation.isPending ? 'Updating...' : 'Update Prices'}
+            {scrapeRangeMutation.isPending ? 'Updating...' : 'Update Date Range'}
           </Button>
         </DialogActions>
       </Dialog>
