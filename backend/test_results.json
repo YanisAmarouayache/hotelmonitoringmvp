@@ -1,0 +1,45 @@
+{
+  "test_timestamp": "2025-06-22T18:45:28.760554",
+  "test_url": "https://www.booking.com/hotel/fr/brach-paris.html?ssne=Paris&ssne_untouched=Paris&highlighted_hotels=3593025&ss=Paris&dest_id=-1456928&dest_type=city&hp_avform=1&origin=hp&do_availability_check=1&label=brach-paris-zZ9WH8N2TuY83vvNrEJaAwS410071049405%3Apl%3Ata%3Ap1%3Ap2%3Aac%3Aap%3Aneg%3Afi%3Atikwd-447709349445%3Alp1006094%3Ali%3Adec%3Adm%3Appccp%3DUmFuZG9tSVYkc2RlIyh9YTQUGSsRwx9_3qo3uPTHyoo&sid=7ef522001e29f4651cee7b8c1851cc55&aid=311984&lang=en-gb&sb=1&src_elem=sb&src=hotel&checkin=2025-06-23&checkout=2025-06-24&group_adults=2&no_rooms=1&group_children=1&age=1#group_recommendation",
+  "hotel_id_extraction": 3593025,
+  "url_parameters": {
+    "ssne": "Paris",
+    "ssne_untouched": "Paris",
+    "highlighted_hotels": "3593025",
+    "ss": "Paris",
+    "dest_id": "-1456928",
+    "dest_type": "city",
+    "hp_avform": "1",
+    "origin": "hp",
+    "do_availability_check": "1",
+    "label": "brach-paris-zZ9WH8N2TuY83vvNrEJaAwS410071049405:pl:ta:p1:p2:ac:ap:neg:fi:tikwd-447709349445:lp1006094:li:dec:dm:ppccp=UmFuZG9tSVYkc2RlIyh9YTQUGSsRwx9_3qo3uPTHyoo",
+    "sid": "7ef522001e29f4651cee7b8c1851cc55",
+    "aid": "311984",
+    "lang": "en-gb",
+    "sb": "1",
+    "src_elem": "sb",
+    "src": "hotel",
+    "checkin": "2025-06-23",
+    "checkout": "2025-06-24",
+    "group_adults": "2",
+    "no_rooms": "1",
+    "group_children": "1",
+    "age": "1"
+  },
+  "calendar_result": {
+    "error": "Expecting value: line 1 column 1 (char 0)",
+    "booking_url": "https://www.booking.com/hotel/fr/brach-paris.html?ssne=Paris&ssne_untouched=Paris&highlighted_hotels=3593025&ss=Paris&dest_id=-1456928&dest_type=city&hp_avform=1&origin=hp&do_availability_check=1&label=brach-paris-zZ9WH8N2TuY83vvNrEJaAwS410071049405%3Apl%3Ata%3Ap1%3Ap2%3Aac%3Aap%3Aneg%3Afi%3Atikwd-447709349445%3Alp1006094%3Ali%3Adec%3Adm%3Appccp%3DUmFuZG9tSVYkc2RlIyh9YTQUGSsRwx9_3qo3uPTHyoo&sid=7ef522001e29f4651cee7b8c1851cc55&aid=311984&lang=en-gb&sb=1&src_elem=sb&src=hotel&checkin=2025-06-23&checkout=2025-06-24&group_adults=2&no_rooms=1&group_children=1&age=1#group_recommendation",
+    "scraped_at": "2025-06-22T18:45:22.686140"
+  },
+  "hotel_basic_info": {},
+  "full_scraping_result": {
+    "hotel_data": {},
+    "pricing_data": {
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "booking_url": "https://www.booking.com/hotel/fr/brach-paris.html?ssne=Paris&ssne_untouched=Paris&highlighted_hotels=3593025&ss=Paris&dest_id=-1456928&dest_type=city&hp_avform=1&origin=hp&do_availability_check=1&label=brach-paris-zZ9WH8N2TuY83vvNrEJaAwS410071049405%3Apl%3Ata%3Ap1%3Ap2%3Aac%3Aap%3Aneg%3Afi%3Atikwd-447709349445%3Alp1006094%3Ali%3Adec%3Adm%3Appccp%3DUmFuZG9tSVYkc2RlIyh9YTQUGSsRwx9_3qo3uPTHyoo&sid=7ef522001e29f4651cee7b8c1851cc55&aid=311984&lang=en-gb&sb=1&src_elem=sb&src=hotel&checkin=2025-06-23&checkout=2025-06-24&group_adults=2&no_rooms=1&group_children=1&age=1#group_recommendation",
+      "scraped_at": "2025-06-22T18:45:28.760051"
+    },
+    "scraped_at": "2025-06-22T18:45:28.760051",
+    "booking_url": "https://www.booking.com/hotel/fr/brach-paris.html?ssne=Paris&ssne_untouched=Paris&highlighted_hotels=3593025&ss=Paris&dest_id=-1456928&dest_type=city&hp_avform=1&origin=hp&do_availability_check=1&label=brach-paris-zZ9WH8N2TuY83vvNrEJaAwS410071049405%3Apl%3Ata%3Ap1%3Ap2%3Aac%3Aap%3Aneg%3Afi%3Atikwd-447709349445%3Alp1006094%3Ali%3Adec%3Adm%3Appccp%3DUmFuZG9tSVYkc2RlIyh9YTQUGSsRwx9_3qo3uPTHyoo&sid=7ef522001e29f4651cee7b8c1851cc55&aid=311984&lang=en-gb&sb=1&src_elem=sb&src=hotel&checkin=2025-06-23&checkout=2025-06-24&group_adults=2&no_rooms=1&group_children=1&age=1#group_recommendation"
+  }
+}

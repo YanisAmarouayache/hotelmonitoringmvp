@@ -4,12 +4,16 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 import sys
 import os
+import asyncio
+import subprocess
+import json
 from pydantic import BaseModel
 
 # Add the scraper directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'scraper'))
 
 from booking_scraper import BookingScraper
+from booking_playwright_final import BookingPlaywrightScraper
 from app.database import get_db
 from app.models.hotel import (
     Hotel, HotelPrice, HotelCreate, HotelPriceCreate, 
@@ -25,6 +29,14 @@ class UpdatePricesRequest(BaseModel):
 class ScrapeDateRangeRequest(BaseModel):
     start_date: str
     end_date: str
+
+class PlaywrightScrapeRequest(BaseModel):
+    url: str
+
+class PlaywrightScrapeResponse(BaseModel):
+    success: bool
+    data: dict = None
+    error: str = None
 
 @router.post("/hotel", response_model=ScrapingResponse)
 async def scrape_hotel(
@@ -444,6 +456,65 @@ async def scrape_date_range(
             'success': False,
             'error': str(e)
         }
+
+@router.post("/playwright-scrape", response_model=PlaywrightScrapeResponse)
+async def playwright_scrape(request: PlaywrightScrapeRequest):
+    """Scrape Booking.com hotel pricing using Playwright via worker process."""
+    try:
+        print(f"Starting Playwright scrape for URL: {request.url}")
+        
+        # Utiliser le worker script pour éviter les problèmes d'event loop
+        worker_script = os.path.join(os.path.dirname(__file__), '..', '..', 'playwright_worker.py')
+        
+        result = subprocess.run(
+            [sys.executable, worker_script, request.url],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(__file__)
+        )
+        
+        if result.returncode == 0:
+            scraper_result = json.loads(result.stdout.strip())
+            print(f"Scraping completed, success: {scraper_result.get('success')}")
+            
+            if scraper_result.get("success"):
+                # Simplifier les données pour éviter les problèmes de sérialisation
+                simplified_data = {
+                    "hotel_url": scraper_result.get("hotel_url"),
+                    "total_days": scraper_result.get("total_days", 0),
+                    "scraped_at": scraper_result.get("scraped_at"),
+                    "raw_responses_count": scraper_result.get("raw_responses_count", 0)
+                }
+                
+                # Ajouter quelques exemples de prix si disponibles
+                pricing_data = scraper_result.get("pricing_data", {})
+                if pricing_data and "days" in pricing_data:
+                    days = pricing_data["days"]
+                    if days:
+                        simplified_data["sample_prices"] = [
+                            {
+                                "checkin": day.get("checkin"),
+                                "price": day.get("price"),
+                                "price_formatted": day.get("price_formatted")
+                            }
+                            for day in days[:5]  # Juste les 5 premiers
+                        ]
+                
+                return PlaywrightScrapeResponse(success=True, data=simplified_data)
+            else:
+                error_msg = scraper_result.get("error", "Unknown error")
+                print(f"Scraping failed: {error_msg}")
+                return PlaywrightScrapeResponse(success=False, error=error_msg)
+        else:
+            error_msg = f"Worker process failed: {result.stderr}"
+            print(f"Worker error: {error_msg}")
+            return PlaywrightScrapeResponse(success=False, error=error_msg)
+            
+    except Exception as e:
+        print(f"Exception in playwright_scrape: {e}")
+        import traceback
+        traceback.print_exc()
+        return PlaywrightScrapeResponse(success=False, error=str(e))
 
 @router.get("/status")
 async def get_scraping_status():

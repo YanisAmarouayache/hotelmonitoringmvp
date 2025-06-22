@@ -1,0 +1,300 @@
+{
+  "success": true,
+  "hotel_url": "https://www.booking.com/hotel/fr/bonne-nouvelle.html",
+  "pricing_data": {
+    "hotel_id": 192053,
+    "days": [
+      {
+        "checkin": "2025-07-11",
+        "available": true,
+        "price": 236.0,
+        "price_formatted": "$236",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-12",
+        "available": true,
+        "price": 270.0,
+        "price_formatted": "$270",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-10",
+        "available": true,
+        "price": 236.0,
+        "price_formatted": "$236",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-15",
+        "available": true,
+        "price": 213.0,
+        "price_formatted": "$213",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-02",
+        "available": true,
+        "price": 192.0,
+        "price_formatted": "$192",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-16",
+        "available": true,
+        "price": 213.0,
+        "price_formatted": "$213",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-13",
+        "available": true,
+        "price": 191.0,
+        "price_formatted": "$191",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-14",
+        "available": true,
+        "price": 224.0,
+        "price_formatted": "$224",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-08",
+        "available": true,
+        "price": 258.0,
+        "price_formatted": "$258",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-09",
+        "available": true,
+        "price": 258.0,
+        "price_formatted": "$258",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-06",
+        "available": true,
+        "price": 179.0,
+        "price_formatted": "$179",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-07",
+        "available": true,
+        "price": 236.0,
+        "price_formatted": "$236",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-23",
+        "available": true,
+        "price": 168.0,
+        "price_formatted": "$168",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-20",
+        "available": true,
+        "price": 168.0,
+        "price_formatted": "$168",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-21",
+        "available": true,
+        "price": 162.0,
+        "price_formatted": "$162",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-13",
+        "available": true,
+        "price": 224.0,
+        "price_formatted": "$224",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-27",
+        "available": true,
+        "price": 123.0,
+        "price_formatted": "$123",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-24",
+        "available": true,
+        "price": 178.0,
+        "price_formatted": "$178",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-19",
+        "available": true,
+        "price": 224.0,
+        "price_formatted": "$224",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-05",
+        "available": true,
+        "price": 343.0,
+        "price_formatted": "$343",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-17",
+        "available": true,
+        "price": 179.0,
+        "price_formatted": "$179",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-08",
+        "available": true,
+        "price": 224.0,
+        "price_formatted": "$224",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-18",
+        "available": true,
+        "price": 202.0,
+        "price_formatted": "$202",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-20",
+        "available": true,
+        "price": 199.0,
+        "price_formatted": "$199",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-31",
+        "available": true,
+        "price": 145.0,
+        "price_formatted": "$145",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-24",
+        "available": true,
+        "price": 450.0,
+        "price_formatted": "$450",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-23",
+        "available": true,
+        "price": 219.0,
+        "price_formatted": "$219",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-26",
+        "available": true,
+        "price": 427.0,
+        "price_formatted": "$427",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-25",
+        "available": true,
+        "price": 500.0,
+        "price_formatted": "$500",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-30",
+        "available": true,
+        "price": 187.0,
+        "price_formatted": "$187",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-28",
+        "available": true,
+        "price": 178.0,
+        "price_formatted": "$178",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-29",
+        "available": true,
+        "price": 205.0,
+        "price_formatted": "$205",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-01",
+        "available": true,
+        "price": 312.0,
+        "price_formatted": "$312",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-30",
+        "available": true,
+        "price": 258.0,
+        "price_formatted": "$258",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-04",
+        "available": true,
+        "price": 236.0,
+        "price_formatted": "$236",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-05",
+        "available": true,
+        "price": 281.0,
+        "price_formatted": "$281",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-02",
+        "available": true,
+        "price": 281.0,
+        "price_formatted": "$281",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-07-03",
+        "available": true,
+        "price": 287.0,
+        "price_formatted": "$287",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-28",
+        "available": true,
+        "price": 394.0,
+        "price_formatted": "$394",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-27",
+        "available": true,
+        "price": 348.0,
+        "price_formatted": "$348",
+        "min_length_of_stay": 1
+      },
+      {
+        "checkin": "2025-06-29",
+        "available": true,
+        "price": 274.0,
+        "price_formatted": "$274",
+        "min_length_of_stay": 1
+      }
+    ],
+    "total_available_days": 41
+  },
+  "total_days": 41,
+  "scraped_at": "2025-06-22T20:00:56.857036",
+  "raw_responses_count": 6
+}

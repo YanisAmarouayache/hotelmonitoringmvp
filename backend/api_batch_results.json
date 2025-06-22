@@ -1,0 +1,22 @@
+{
+  "success": true,
+  "results": [
+    {
+      "url": "https://www.booking.com/hotel/fr/bonne-nouvelle.html",
+      "success": false,
+      "error": "object dict can't be used in 'await' expression"
+    },
+    {
+      "url": "https://www.booking.com/hotel/fr/brach-paris.html",
+      "success": false,
+      "error": "object dict can't be used in 'await' expression"
+    }
+  ],
+  "total_processed": 2,
+  "successful": 0,
+  "failed": 2,
+  "errors": [
+    "URL https://www.booking.com/hotel/fr/bonne-nouvelle.html: object dict can't be used in 'await' expression",
+    "URL https://www.booking.com/hotel/fr/brach-paris.html: object dict can't be used in 'await' expression"
+  ]
+}
