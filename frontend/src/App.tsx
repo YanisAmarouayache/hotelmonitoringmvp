@@ -6,6 +6,7 @@ import HotelDetails from './pages/HotelDetails'
 import AddHotel from './pages/AddHotel'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
+import HotelComparison from './pages/HotelComparison'
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
             <Route path="/hotels/:id" element={<HotelDetails />} />
             <Route path="/add-hotel" element={<AddHotel />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/comparison" element={<HotelComparison />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </Container>

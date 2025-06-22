@@ -22,7 +22,17 @@ import {
   TextField,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   LocationOn as LocationIcon,
@@ -40,7 +50,10 @@ import {
   AttachMoney as MoneyIcon,
   CalendarToday as CalendarIcon,
   ExpandMore as ExpandMoreIcon,
-  DateRange as DateRangeIcon
+  DateRange as DateRangeIcon,
+  CompareArrows as CompareIcon,
+  Visibility as ViewIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -153,6 +166,12 @@ const HotelDetails: React.FC = () => {
         startDate: checkInDate,
         endDate: checkOutDate
       });
+    }
+  };
+
+  const handleCompare = () => {
+    if (hotel) {
+      navigate(`/comparison?primary=${hotel.id}`);
     }
   };
 
@@ -1122,6 +1141,14 @@ const HotelDetails: React.FC = () => {
                   fullWidth
                 >
                   Set Alerts
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<CompareIcon />}
+                  fullWidth
+                  onClick={handleCompare}
+                >
+                  Compare
                 </Button>
               </Box>
             </CardContent>

@@ -24,7 +24,9 @@ import {
   Grid,
   Card,
   CardContent,
-  CardActions
+  CardActions,
+  ToggleButton,
+  ToggleButtonGroup
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -33,7 +35,10 @@ import {
   TrendingUp as TrendingUpIcon,
   LocationOn as LocationIcon,
   Star as StarIcon,
-  DateRange as DateRangeIcon
+  DateRange as DateRangeIcon,
+  CompareArrows as CompareIcon,
+  ViewList as ViewListIcon,
+  ViewModule as ViewModuleIcon
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -102,6 +107,10 @@ const HotelList: React.FC = () => {
   const handleScrapeDateRange = (hotel: Hotel) => {
     setSelectedHotel(hotel);
     setRangeDialogOpen(true);
+  };
+
+  const handleCompare = (hotel: Hotel) => {
+    navigate(`/comparison?primary=${hotel.id}`);
   };
 
   // Validate date range
@@ -317,6 +326,14 @@ const HotelList: React.FC = () => {
                           <ViewIcon />
                         </IconButton>
                       </Tooltip>
+                      <Tooltip title="Compare">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleCompare(hotel)}
+                        >
+                          <CompareIcon />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Delete Hotel">
                         <IconButton
                           size="small"
@@ -457,6 +474,13 @@ const HotelList: React.FC = () => {
                     onClick={() => navigate(`/hotels/${hotel.id}`)}
                   >
                     View Details
+                  </Button>
+                  <Button
+                    size="small"
+                    startIcon={<CompareIcon />}
+                    onClick={() => handleCompare(hotel)}
+                  >
+                    Compare
                   </Button>
                   <Button
                     size="small"

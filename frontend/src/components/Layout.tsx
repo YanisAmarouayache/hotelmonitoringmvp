@@ -4,6 +4,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import HotelIcon from '@mui/icons-material/Hotel';
 import AddBusinessIcon from '@mui/icons-material/AddBusiness';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -13,6 +14,7 @@ const navItems = [
   { text: 'Hotel List', icon: <HotelIcon />, path: '/hotels' },
   { text: 'Add Hotel', icon: <AddBusinessIcon />, path: '/add-hotel' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
+  { text: 'Comparison', icon: <CompareArrowsIcon />, path: '/comparison' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];
 
